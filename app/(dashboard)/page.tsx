@@ -20,13 +20,15 @@ export default async function DashboardPage() {
   const config = getGoogleConfig();
   
   let isConnected = false;
+  let isInitialized = false;
   if (config) {
     const testRes = await testGoogleConnection(config);
     isConnected = testRes.success;
+    isInitialized = testRes.isInitialized || false;
   }
 
-  // Fallback states if not connected
-  if (!isConnected) {
+  // Fallback states if not connected or not initialized
+  if (!isConnected || !isInitialized) {
     return (
       <div className="flex flex-col flex-1 overflow-y-auto">
         <Topbar title="Dashboard" isDatabaseConnected={false} />
@@ -35,11 +37,16 @@ export default async function DashboardPage() {
             <div className="w-16 h-16 bg-blue-50 text-[#1E3A8A] rounded-2xl flex items-center justify-center mx-auto mb-6 border border-blue-100">
               <Database className="w-8 h-8" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-2">Google Sheets Belum Terhubung</h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">
+              {!isConnected ? "Google Sheets Belum Terhubung" : "Spreadsheet Belum Diinisialisasi"}
+            </h3>
             <p className="text-sm text-slate-500 mb-6">
-              {user 
-                ? "Koneksi ke basis data Google Sheets belum dikonfigurasi atau tidak valid. Silakan atur kredensial dan hubungkan spreadsheet Anda."
-                : "Koneksi ke basis data Google Sheets belum dikonfigurasi atau tidak valid. Harap login sebagai QA untuk mengatur kredensial."
+              {!isConnected 
+                ? (user 
+                  ? "Koneksi ke basis data Google Sheets belum dikonfigurasi atau tidak valid. Silakan atur kredensial dan hubungkan spreadsheet Anda."
+                  : "Koneksi ke basis data Google Sheets belum dikonfigurasi atau tidak valid. Harap login sebagai QA untuk mengatur kredensial."
+                  )
+                : "Koneksi ke spreadsheet berhasil, namun struktur tabel/sheet di dalamnya belum diinisialisasi. Silakan inisialisasi sekarang agar dashboard dapat berfungsi."
               }
             </p>
             <div className="flex flex-col gap-2">
@@ -48,7 +55,7 @@ export default async function DashboardPage() {
                   href="/integration" 
                   className="px-4 py-2.5 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-md"
                 >
-                  Hubungkan Google Sheets
+                  {!isConnected ? "Hubungkan Google Sheets" : "Inisialisasi Spreadsheet"}
                 </Link>
               ) : (
                 <Link 

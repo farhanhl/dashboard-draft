@@ -20,7 +20,10 @@ export function Topbar({ title, subtitle, isDatabaseConnected = true }: TopbarPr
       month: 'long', 
       day: 'numeric' 
     };
-    setCurrentDate(new Date().toLocaleDateString('id-ID', options));
+    const timer = setTimeout(() => {
+      setCurrentDate(new Date().toLocaleDateString('id-ID', options));
+    }, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   return (

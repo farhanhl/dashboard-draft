@@ -69,6 +69,17 @@ export function getGoogleConfig(): GoogleConfig | null {
   return null;
 }
 
+// Helper to sanitize private key formatting (removes spacing/newline issues)
+export function cleanPrivateKey(key: string): string {
+  if (!key) return '';
+  return key
+    .replace(/\\n/g, '\n')      // Replace literal '\n' text with actual newlines
+    .split(/\r?\n/)            // Split by any newline characters
+    .map(line => line.trim())   // Trim leading/trailing whitespace from each line
+    .filter(line => line.length > 0) // Remove empty lines
+    .join('\n');                // Rejoin with actual newlines
+}
+
 // 2. Save Google Credentials to local config
 export function saveGoogleConfig(config: GoogleConfig): void {
   try {
@@ -76,11 +87,11 @@ export function saveGoogleConfig(config: GoogleConfig): void {
       fs.mkdirSync(CREDENTIALS_DIR, { recursive: true });
     }
     
-    // Ensure the private key has correct newline characters
+    // Ensure the private key is fully cleaned and sanitized
     const formattedConfig = {
       spreadsheetId: config.spreadsheetId.trim(),
       clientEmail: config.clientEmail.trim(),
-      privateKey: config.privateKey.replace(/\\n/g, '\n').trim(),
+      privateKey: cleanPrivateKey(config.privateKey),
       sheetNames: config.sheetNames || DEFAULT_SHEET_NAMES,
     };
 
@@ -95,7 +106,7 @@ export function saveGoogleConfig(config: GoogleConfig): void {
 export async function getSheetsClient(config: GoogleConfig) {
   const auth = new google.auth.JWT({
     email: config.clientEmail,
-    key: config.privateKey,
+    key: cleanPrivateKey(config.privateKey),
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });
 
@@ -103,15 +114,35 @@ export async function getSheetsClient(config: GoogleConfig) {
 }
 
 // 4. Test Google Sheets Connection
-export async function testGoogleConnection(config: GoogleConfig): Promise<{ success: boolean; spreadsheetTitle?: string; error?: string }> {
+export async function testGoogleConnection(config: GoogleConfig): Promise<{ 
+  success: boolean; 
+  spreadsheetTitle?: string; 
+  isInitialized?: boolean; 
+  error?: string 
+}> {
   try {
     const sheets = await getSheetsClient(config);
     const response = await sheets.spreadsheets.get({
       spreadsheetId: config.spreadsheetId,
     });
+    
+    // Verify if all required sheets exist
+    const existingSheets = response.data.sheets?.map(s => s.properties?.title || '') || [];
+    const sheetNamesMap = config.sheetNames || DEFAULT_SHEET_NAMES;
+    let isInitialized = true;
+    
+    for (const key of Object.keys(DEFAULT_SHEET_NAMES)) {
+      const actualTitle = sheetNamesMap[key as keyof typeof DEFAULT_SHEET_NAMES] || DEFAULT_SHEET_NAMES[key as keyof typeof DEFAULT_SHEET_NAMES];
+      if (!existingSheets.includes(actualTitle)) {
+        isInitialized = false;
+        break;
+      }
+    }
+
     return {
       success: true,
       spreadsheetTitle: response.data.properties?.title || 'Google Sheet',
+      isInitialized,
     };
   } catch (error: any) {
     console.error('Connection test error:', error);
@@ -159,8 +190,13 @@ export async function readSheetRows<T = Record<string, string>>(sheetNameKey: ke
     }
 
     return rows;
-  } catch (error) {
-    console.error(`Error reading sheet "${actualSheetName}":`, error);
+  } catch (error: any) {
+    const isRangeError = error?.message?.includes('Unable to parse range') || error?.code === 400;
+    if (isRangeError) {
+      console.warn(`[Google Sheets API] Sheet "${actualSheetName}" belum diinisialisasi.`);
+    } else {
+      console.error(`Error reading sheet "${actualSheetName}":`, error);
+    }
     return [];
   }
 }

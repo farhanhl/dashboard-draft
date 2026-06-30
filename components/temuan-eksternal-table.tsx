@@ -61,8 +61,8 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
 
   // Sort data
   const sortedData = [...filteredData].sort((a, b) => {
-    let aVal = a[sortField] || '';
-    let bVal = b[sortField] || '';
+    const aVal = a[sortField] || '';
+    const bVal = b[sortField] || '';
 
     if (aVal < bVal) return sortAsc ? -1 : 1;
     if (aVal > bVal) return sortAsc ? 1 : -1;

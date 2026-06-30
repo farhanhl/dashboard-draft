@@ -266,7 +266,7 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
                         {row.bulan || 'Januari'}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-slate-500">{new Date(row.created_at || Date.now()).toLocaleDateString('id-ID')}</td>
+                    <td className="px-4 py-4 text-slate-500">{row.created_at ? new Date(row.created_at).toLocaleDateString('id-ID') : '-'}</td>
                     <td className="px-6 py-4 max-w-sm truncate text-slate-500 font-medium">{row.temuan}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">

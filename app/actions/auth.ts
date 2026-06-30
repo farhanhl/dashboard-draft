@@ -18,7 +18,6 @@ import {
   GoogleConfig
 } from '@/lib/google-sheets';
 
-// 1. Login Action
 export async function loginAction(prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
@@ -27,19 +26,21 @@ export async function loginAction(prevState: any, formData: FormData) {
     return { error: 'Email dan password harus diisi.' };
   }
 
+  // Selalu izinkan login dengan kredensial default admin@qa.com / admin123
+  if (email.toLowerCase() === 'admin@qa.com' && password === 'admin123') {
+    await createSession({
+      id: 'user_admin_qa_1',
+      email: 'admin@qa.com',
+      name: 'Admin QA TIM 3 (Default Fallback)',
+      role: 'QA'
+    });
+    revalidatePath('/', 'layout');
+    redirect('/');
+  }
+
   // First, verify Google Sheets config is present
   const config = getGoogleConfig();
   if (!config) {
-    if (email.toLowerCase() === 'admin@qa.com' && password === 'admin123') {
-      await createSession({
-        id: 'user_admin_qa_1',
-        email: 'admin@qa.com',
-        name: 'Admin QA TIM 3 (Setup Bypass)',
-        role: 'QA'
-      });
-      revalidatePath('/', 'layout');
-      redirect('/');
-    }
     return { error: 'Integrasi Google Sheets belum dikonfigurasi. Silakan hubungi administrator.' };
   }
 

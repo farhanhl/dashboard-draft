@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
-import { appendSheetRow, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 
 // --- TEMUAN SAMPLING ACTIONS ---
 
@@ -103,5 +103,59 @@ export async function deleteTemuanEksternalAction(rowIndex: number) {
     return { success: true, message: 'Data temuan eksternal berhasil dihapus.' };
   } else {
     return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
+  }
+}
+
+// Batch Import Temuan Sampling
+export async function importTemuanSamplingAction(rows: Record<string, any>[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Tidak ada data untuk di-import.' };
+  }
+
+  const preparedRows = rows.map(row => ({
+    ...row,
+    id: row.id || `ts_${crypto.randomUUID()}`,
+    created_at: row.created_at || new Date().toISOString(),
+  }));
+
+  const success = await appendSheetRows('temuanSampling', preparedRows);
+  if (success) {
+    revalidatePath('/temuan-sampling');
+    revalidatePath('/');
+    return { success: true, message: `Berhasil meng-import ${rows.length} data temuan sampling.` };
+  } else {
+    return { success: false, error: 'Gagal meng-import data ke Google Sheets.' };
+  }
+}
+
+// Batch Import Temuan Eksternal
+export async function importTemuanEksternalAction(rows: Record<string, any>[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Tidak ada data untuk di-import.' };
+  }
+
+  const preparedRows = rows.map(row => ({
+    ...row,
+    id: row.id || `te_${crypto.randomUUID()}`,
+    created_at: row.created_at || new Date().toISOString(),
+  }));
+
+  const success = await appendSheetRows('temuanEksternal', preparedRows);
+  if (success) {
+    revalidatePath('/temuan-eksternal');
+    revalidatePath('/');
+    return { success: true, message: `Berhasil meng-import ${rows.length} data temuan eksternal.` };
+  } else {
+    return { success: false, error: 'Gagal meng-import data ke Google Sheets.' };
   }
 }

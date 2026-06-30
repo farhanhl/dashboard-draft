@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
-import { appendSheetRow, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 
 // --- SURVEY KEPUASAN ACTIONS ---
 
@@ -100,5 +100,71 @@ export async function deleteTicketSamplingAction(rowIndex: number) {
     return { success: true, message: 'Data list ticket sampling berhasil dihapus.' };
   } else {
     return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
+  }
+}
+
+// Batch Import Survey Kepuasan
+export async function importSurveyKepuasanAction(rows: Record<string, any>[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Tidak ada data untuk di-import.' };
+  }
+
+  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const preparedRows = rows.map(row => {
+    const cleanRow = { ...row };
+    months.forEach(m => {
+      if (cleanRow[m] !== undefined) {
+        cleanRow[m] = cleanRow[m] === true || String(cleanRow[m]).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
+      } else {
+        cleanRow[m] = 'FALSE';
+      }
+    });
+    return cleanRow;
+  });
+
+  const success = await appendSheetRows('surveyKepuasan', preparedRows);
+  if (success) {
+    revalidatePath('/survey-kepuasan');
+    return { success: true, message: `Berhasil meng-import ${rows.length} data checklist survey kepuasan.` };
+  } else {
+    return { success: false, error: 'Gagal meng-import data ke Google Sheets.' };
+  }
+}
+
+// Batch Import Ticket Sampling
+export async function importTicketSamplingAction(rows: Record<string, any>[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Tidak ada data untuk di-import.' };
+  }
+
+  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const preparedRows = rows.map(row => {
+    const cleanRow = { ...row };
+    months.forEach(m => {
+      if (cleanRow[m] !== undefined) {
+        cleanRow[m] = cleanRow[m] === true || String(cleanRow[m]).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
+      } else {
+        cleanRow[m] = 'FALSE';
+      }
+    });
+    return cleanRow;
+  });
+
+  const success = await appendSheetRows('listTicketSampling', preparedRows);
+  if (success) {
+    revalidatePath('/ticket-sampling');
+    return { success: true, message: `Berhasil meng-import ${rows.length} data list ticket sampling.` };
+  } else {
+    return { success: false, error: 'Gagal meng-import data ke Google Sheets.' };
   }
 }

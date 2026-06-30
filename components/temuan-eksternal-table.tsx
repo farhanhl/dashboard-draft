@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef } from 'react';
 import { 
   Search, 
   Download, 
+  Upload, 
   Plus, 
   Edit2, 
   Trash2, 
@@ -14,7 +15,7 @@ import {
   Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { saveTemuanEksternalAction, deleteTemuanEksternalAction } from '@/app/actions/temuan';
+import { saveTemuanEksternalAction, deleteTemuanEksternalAction, importTemuanEksternalAction } from '@/app/actions/temuan';
 
 interface TemuanEksternalTableProps {
   data: any[];
@@ -30,6 +31,115 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
   const [sortAsc, setSortAsc] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // Import State & Ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const dataBytes = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(dataBytes, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        if (json.length === 0) {
+          alert('Spreadsheet kosong.');
+          return;
+        }
+
+        const mappedRows = json.map(row => {
+          const mapped: any = {};
+          
+          const petugasKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'nama petugas' || 
+            k.toLowerCase() === 'petugas_name' || 
+            k.toLowerCase() === 'nama' ||
+            k.toLowerCase() === 'petugas'
+          );
+          mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
+
+          const kodeTiketKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'kode tiket' || 
+            k.toLowerCase() === 'kode_tiket' ||
+            k.toLowerCase() === 'tiket'
+          );
+          mapped.kode_tiket = kodeTiketKey ? String(row[kodeTiketKey]).trim() : '';
+
+          const tglTemuanKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'tanggal temuan' || 
+            k.toLowerCase() === 'tanggal_temuan' ||
+            k.toLowerCase() === 'tgl temuan'
+          );
+          mapped.tanggal_temuan = tglTemuanKey ? String(row[tglTemuanKey]).trim() : '';
+
+          const sumberKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'sumber' || 
+            k.toLowerCase() === 'sumber temuan'
+          );
+          mapped.sumber = sumberKey ? String(row[sumberKey]).trim() : '';
+
+          const risikoKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'risiko' || 
+            k.toLowerCase() === 'resiko'
+          );
+          let rawRisiko = risikoKey ? String(row[risikoKey]).trim() : 'Sedang';
+          if (rawRisiko) {
+            rawRisiko = rawRisiko.charAt(0).toUpperCase() + rawRisiko.slice(1).toLowerCase();
+          }
+          if (!['Rendah', 'Sedang', 'Tinggi'].includes(rawRisiko)) {
+            rawRisiko = 'Sedang';
+          }
+          mapped.risiko = rawRisiko;
+
+          const keteranganKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'keterangan temuan' || 
+            k.toLowerCase() === 'keterangan_temuan' ||
+            k.toLowerCase() === 'keterangan' ||
+            k.toLowerCase() === 'temuan'
+          );
+          mapped.keterangan_temuan = keteranganKey ? String(row[keteranganKey]).trim() : '';
+
+          const rekKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'rekomendasi' ||
+            k.toLowerCase() === 'rekomendasi / rencana aksi'
+          );
+          mapped.rekomendasi = rekKey ? String(row[rekKey]).trim() : '';
+
+          return mapped;
+        }).filter(r => r.petugas_name);
+
+        if (mappedRows.length === 0) {
+          alert('Tidak ada data petugas yang valid ditemukan.');
+          return;
+        }
+
+        if (confirm(`Apakah Anda yakin ingin meng-import ${mappedRows.length} data temuan eksternal?`)) {
+          startTransition(async () => {
+            const res = await importTemuanEksternalAction(mappedRows);
+            if (res.success) {
+              alert(res.message);
+            } else {
+              alert(res.error);
+            }
+          });
+        }
+      } catch (err: any) {
+        alert(`Gagal memproses file: ${err.message}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
 
   // CRUD & Details States
   const [showModal, setShowModal] = useState(false);
@@ -243,13 +353,31 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
           </button>
           
           {isQA && (
-            <button
-              onClick={openAddModal}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Catat Temuan
-            </button>
+            <>
+              <input 
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImport}
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={handleImportClick}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Excel
+              </button>
+              <button
+                onClick={openAddModal}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Catat Temuan
+              </button>
+            </>
           )}
         </div>
       </div>

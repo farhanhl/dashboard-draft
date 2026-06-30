@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef } from 'react';
 import { 
   Search, 
   Download, 
+  Upload,
   Plus, 
   Edit2, 
   Trash2, 
@@ -15,7 +16,7 @@ import {
   Info
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { saveTemuanSamplingAction, deleteTemuanSamplingAction } from '@/app/actions/temuan';
+import { saveTemuanSamplingAction, deleteTemuanSamplingAction, importTemuanSamplingAction } from '@/app/actions/temuan';
 
 interface TemuanSamplingTableProps {
   data: any[];
@@ -31,6 +32,125 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
   const [sortAsc, setSortAsc] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // Import State & Ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const dataBytes = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(dataBytes, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        if (json.length === 0) {
+          alert('Spreadsheet kosong.');
+          return;
+        }
+
+        const mappedRows = json.map(row => {
+          const mapped: any = {};
+          
+          const petugasKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'nama petugas' || 
+            k.toLowerCase() === 'petugas_name' || 
+            k.toLowerCase() === 'nama' ||
+            k.toLowerCase() === 'petugas'
+          );
+          mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
+
+          const tglTransKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'tanggal transaksi' || 
+            k.toLowerCase() === 'tanggal_transaksi' ||
+            k.toLowerCase() === 'tgl transaksi'
+          );
+          mapped.tanggal_transaksi = tglTransKey ? String(row[tglTransKey]).trim() : '';
+
+          const tglSampKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'tanggal sampling' || 
+            k.toLowerCase() === 'tanggal_sampling' ||
+            k.toLowerCase() === 'tgl sampling'
+          );
+          mapped.tanggal_sampling = tglSampKey ? String(row[tglSampKey]).trim() : '';
+
+          const weekKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'pekan (week)' || 
+            k.toLowerCase() === 'pekan' ||
+            k.toLowerCase() === 'week'
+          );
+          mapped.week = weekKey ? String(row[weekKey]).trim() : '1';
+
+          // Indicators
+          const indicatorsMap: Record<string, string[]> = {
+            etika_salam: ['salam pembuka', 'etika_salam'],
+            etika_ramah: ['sopan santun', 'etika_ramah'],
+            etika_bahasa: ['tata bahasa', 'etika_bahasa'],
+            keterampilan_menulis: ['keterampilan menulis', 'keterampilan_menulis'],
+            keterampilan_analisis: ['keterampilan analisis', 'keterampilan_analisis'],
+            prosedur_informasi: ['kesesuaian informasi', 'prosedur_informasi'],
+            prosedur_proses: ['kesesuaian prosedur', 'prosedur_proses'],
+            prosedur_tiket: ['kesesuaian tiket', 'prosedur_tiket']
+          };
+
+          Object.entries(indicatorsMap).forEach(([dbField, aliases]) => {
+            const rowKey = Object.keys(row).find(k => 
+              aliases.includes(k.toLowerCase())
+            );
+            if (rowKey !== undefined) {
+              const numVal = parseInt(String(row[rowKey]).replace('%', '').trim());
+              mapped[dbField] = isNaN(numVal) ? 100 : numVal;
+            } else {
+              mapped[dbField] = 100;
+            }
+          });
+
+          const temuanKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'temuan' ||
+            k.toLowerCase() === 'keterangan temuan'
+          );
+          mapped.temuan = temuanKey ? String(row[temuanKey]).trim() : '';
+
+          const rekKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'rekomendasi' ||
+            k.toLowerCase() === 'rekomendasi / rencana aksi'
+          );
+          mapped.rekomendasi = rekKey ? String(row[rekKey]).trim() : '';
+
+          return mapped;
+        }).filter(r => r.petugas_name);
+
+        if (mappedRows.length === 0) {
+          alert('Tidak ada data petugas yang valid ditemukan.');
+          return;
+        }
+
+        if (confirm(`Apakah Anda yakin ingin meng-import ${mappedRows.length} data temuan sampling?`)) {
+          startTransition(async () => {
+            const res = await importTemuanSamplingAction(mappedRows);
+            if (res.success) {
+              alert(res.message);
+            } else {
+              alert(res.error);
+            }
+          });
+        }
+      } catch (err: any) {
+        alert(`Gagal memproses file: ${err.message}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
 
   // CRUD & Details States
   const [showModal, setShowModal] = useState(false);
@@ -287,13 +407,31 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
           </button>
           
           {isQA && (
-            <button
-              onClick={openAddModal}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Catat Temuan
-            </button>
+            <>
+              <input 
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImport}
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={handleImportClick}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Excel
+              </button>
+              <button
+                onClick={openAddModal}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Catat Temuan
+              </button>
+            </>
           )}
         </div>
       </div>

@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef } from 'react';
 import { 
   Search, 
   Plus, 
+  Upload,
+  Download,
   Trash2, 
   X, 
   RefreshCw, 
@@ -11,7 +13,8 @@ import {
   Square,
   AlertCircle 
 } from 'lucide-react';
-import { saveSurveyKepuasanAction, deleteSurveyKepuasanAction } from '@/app/actions/checklists';
+import * as XLSX from 'xlsx';
+import { saveSurveyKepuasanAction, deleteSurveyKepuasanAction, importSurveyKepuasanAction } from '@/app/actions/checklists';
 
 interface SurveyKepuasanTableProps {
   data: any[];
@@ -23,6 +26,102 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
   const [isPending, startTransition] = useTransition();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+
+  // Import State & Ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const dataBytes = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(dataBytes, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        if (json.length === 0) {
+          alert('Spreadsheet kosong.');
+          return;
+        }
+
+        const mappedRows = json.map(row => {
+          const mapped: any = {};
+          
+          const petugasKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'nama petugas' || 
+            k.toLowerCase() === 'petugas_name' || 
+            k.toLowerCase() === 'nama' ||
+            k.toLowerCase() === 'petugas'
+          );
+          mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
+
+          const yearKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'tahun' || 
+            k.toLowerCase() === 'year'
+          );
+          mapped.year = yearKey ? String(row[yearKey]).trim() : new Date().getFullYear().toString();
+
+          const monthMapping: Record<string, string[]> = {
+            jan: ['jan', 'januari', 'january'],
+            feb: ['feb', 'februari', 'february'],
+            mar: ['mar', 'maret', 'march'],
+            apr: ['apr', 'april'],
+            may: ['mei', 'may'],
+            jun: ['jun', 'juni', 'june'],
+            jul: ['jul', 'juli', 'july'],
+            aug: ['agu', 'agustus', 'august', 'aug'],
+            sep: ['sep', 'september'],
+            oct: ['okt', 'oktober', 'october', 'oct'],
+            nov: ['nov', 'november'],
+            dec: ['des', 'desember', 'december', 'dec']
+          };
+
+          Object.entries(monthMapping).forEach(([dbField, aliases]) => {
+            const rowKey = Object.keys(row).find(k => 
+              aliases.includes(k.toLowerCase())
+            );
+            if (rowKey !== undefined) {
+              const valStr = String(row[rowKey]).trim().toLowerCase();
+              const isTrue = valStr === 'true' || valStr === '1' || valStr === 'yes' || valStr === 'ya' || valStr === 'y' || valStr === 'v' || valStr === 'x';
+              mapped[dbField] = isTrue ? 'TRUE' : 'FALSE';
+            } else {
+              mapped[dbField] = 'FALSE';
+            }
+          });
+
+          return mapped;
+        }).filter(r => r.petugas_name);
+
+        if (mappedRows.length === 0) {
+          alert('Tidak ada data petugas yang valid ditemukan.');
+          return;
+        }
+
+        if (confirm(`Apakah Anda yakin ingin meng-import ${mappedRows.length} data checklist survey kepuasan?`)) {
+          startTransition(async () => {
+            const res = await importSurveyKepuasanAction(mappedRows);
+            if (res.success) {
+              alert(res.message);
+            } else {
+              alert(res.error);
+            }
+          });
+        }
+      } catch (err: any) {
+        alert(`Gagal memproses file: ${err.message}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -121,6 +220,25 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
     }
   };
 
+  // Export Excel
+  const handleExport = () => {
+    const exportData = filteredData.map(row => {
+      const formatted: any = {
+        'Nama Petugas': row.petugas_name,
+        'Tahun': row.year,
+      };
+      months.forEach((m, idx) => {
+        formatted[monthLabels[idx]] = row[m] === 'TRUE' || row[m] === true ? 'YA' : 'TIDAK';
+      });
+      return formatted;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `Survey Kepuasan ${selectedYear}`);
+    XLSX.writeFile(wb, `Survey_Kepuasan_Petugas_${selectedYear}.xlsx`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Controls */}
@@ -150,20 +268,48 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
           </select>
         </div>
 
-        {isQA && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              setFormPetugasName(petugasList[0] || '');
-              setFormYear(selectedYear);
-              setErrorMessage('');
-              setShowModal(true);
-            }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all shrink-0"
+            onClick={handleExport}
+            className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Tambah Checklist
+            <Download className="w-3.5 h-3.5" />
+            Export Excel
           </button>
-        )}
+          
+          {isQA && (
+            <>
+              <input 
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImport}
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={handleImportClick}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Excel
+              </button>
+              <button
+                onClick={() => {
+                  setFormPetugasName(petugasList[0] || '');
+                  setFormYear(selectedYear);
+                  setErrorMessage('');
+                  setShowModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Tambah Checklist
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Table Card */}

@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
-import { appendSheetRow, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 
 export async function saveCoachingAction(rowData: Record<string, any>) {
   const user = await getCurrentUser();
@@ -46,5 +46,31 @@ export async function deleteCoachingAction(rowIndex: number) {
     return { success: true, message: 'Data riwayat coaching berhasil dihapus.' };
   } else {
     return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
+  }
+}
+
+// Batch Import Coaching
+export async function importCoachingAction(rows: Record<string, any>[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Tidak ada data untuk di-import.' };
+  }
+
+  const preparedRows = rows.map(row => ({
+    ...row,
+    id: row.id || `co_${crypto.randomUUID()}`,
+    created_at: row.created_at || new Date().toISOString(),
+  }));
+
+  const success = await appendSheetRows('coaching', preparedRows);
+  if (success) {
+    revalidatePath('/coaching');
+    return { success: true, message: `Berhasil meng-import ${rows.length} data riwayat coaching.` };
+  } else {
+    return { success: false, error: 'Gagal meng-import data ke Google Sheets.' };
   }
 }

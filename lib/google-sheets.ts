@@ -250,6 +250,56 @@ export async function appendSheetRow(
   }
 }
 
+// 6b. Append multiple rows to a sheet in a single request
+export async function appendSheetRows(
+  sheetNameKey: keyof typeof DEFAULT_SHEET_NAMES,
+  rowsData: Record<string, any>[]
+): Promise<boolean> {
+  const config = getGoogleConfig();
+  if (!config || rowsData.length === 0) return false;
+
+  const actualSheetName = config.sheetNames?.[sheetNameKey] || DEFAULT_SHEET_NAMES[sheetNameKey];
+
+  try {
+    const sheets = await getSheetsClient(config);
+    
+    // First, read headers to ensure columns match correctly
+    const headerResponse = await sheets.spreadsheets.values.get({
+      spreadsheetId: config.spreadsheetId,
+      range: `${actualSheetName}!A1:ZZ1`,
+    });
+
+    const headers = headerResponse.data.values?.[0] as string[];
+    if (!headers || headers.length === 0) {
+      throw new Error(`Sheet ${actualSheetName} tidak memiliki header.`);
+    }
+
+    // Align each rowData with the sheet's header columns
+    const allRowValues = rowsData.map(rowData => {
+      return headers.map(header => {
+        const val = rowData[header];
+        if (val === undefined || val === null) return '';
+        if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+        return String(val);
+      });
+    });
+
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: config.spreadsheetId,
+      range: `${actualSheetName}!A1`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: allRowValues,
+      },
+    });
+
+    return true;
+  } catch (error) {
+    console.error(`Error appending multiple rows to sheet "${actualSheetName}":`, error);
+    return false;
+  }
+}
+
 // 7. Update an existing row in a sheet using __rowIndex
 export async function updateSheetRow(
   sheetNameKey: keyof typeof DEFAULT_SHEET_NAMES,

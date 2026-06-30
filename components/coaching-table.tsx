@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useRef } from 'react';
 import { 
   Search, 
   Download, 
+  Upload,
   Plus, 
   Edit2, 
   Trash2, 
@@ -14,7 +15,7 @@ import {
   Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { saveCoachingAction, deleteCoachingAction } from '@/app/actions/coaching';
+import { saveCoachingAction, deleteCoachingAction, importCoachingAction } from '@/app/actions/coaching';
 
 interface CoachingTableProps {
   data: any[];
@@ -30,6 +31,101 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
   const [sortAsc, setSortAsc] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+
+  // Import State & Ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const dataBytes = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(dataBytes, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        if (json.length === 0) {
+          alert('Spreadsheet kosong.');
+          return;
+        }
+
+        const mappedRows = json.map(row => {
+          const mapped: any = {};
+          
+          const petugasKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'nama petugas' || 
+            k.toLowerCase() === 'petugas_name' || 
+            k.toLowerCase() === 'nama' ||
+            k.toLowerCase() === 'petugas'
+          );
+          mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
+
+          const bulanKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'bulan coaching' || 
+            k.toLowerCase() === 'bulan'
+          );
+          let rawBulan = bulanKey ? String(row[bulanKey]).trim() : 'Januari';
+          if (rawBulan) {
+            rawBulan = rawBulan.charAt(0).toUpperCase() + rawBulan.slice(1).toLowerCase();
+          }
+          if (!months.includes(rawBulan)) {
+            const monthAliasesMap: Record<string, string> = {
+              jan: 'Januari', feb: 'Februari', mar: 'Maret', apr: 'April', may: 'Mei', jun: 'Juni',
+              jul: 'Juli', aug: 'Agustus', sep: 'September', oct: 'Oktober', nov: 'November', dec: 'Desember',
+              january: 'Januari', february: 'Februari', march: 'Maret', april: 'April', mei: 'Mei', june: 'Juni',
+              july: 'Juli', august: 'Agustus', september: 'September', october: 'Oktober', november: 'November', december: 'Desember'
+            };
+            const mappedBulan = monthAliasesMap[rawBulan.toLowerCase()];
+            rawBulan = mappedBulan || 'Januari';
+          }
+          mapped.bulan = rawBulan;
+
+          const temuanKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'temuan pembahasan' || 
+            k.toLowerCase() === 'temuan' ||
+            k.toLowerCase() === 'keterangan temuan'
+          );
+          mapped.temuan = temuanKey ? String(row[temuanKey]).trim() : '';
+
+          const rekKey = Object.keys(row).find(k => 
+            k.toLowerCase() === 'rekomendasi / rencana aksi' || 
+            k.toLowerCase() === 'rekomendasi'
+          );
+          mapped.rekomendasi = rekKey ? String(row[rekKey]).trim() : '';
+
+          return mapped;
+        }).filter(r => r.petugas_name);
+
+        if (mappedRows.length === 0) {
+          alert('Tidak ada data petugas yang valid ditemukan.');
+          return;
+        }
+
+        if (confirm(`Apakah Anda yakin ingin meng-import ${mappedRows.length} data riwayat coaching?`)) {
+          startTransition(async () => {
+            const res = await importCoachingAction(mappedRows);
+            if (res.success) {
+              alert(res.message);
+            } else {
+              alert(res.error);
+            }
+          });
+        }
+      } catch (err: any) {
+        alert(`Gagal memproses file: ${err.message}`);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
 
   // CRUD & Details States
   const [showModal, setShowModal] = useState(false);
@@ -226,13 +322,31 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
           </button>
           
           {isQA && (
-            <button
-              onClick={openAddModal}
-              className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Catat Coaching
-            </button>
+            <>
+              <input 
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImport}
+                accept=".xlsx,.xls,.csv"
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={handleImportClick}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Excel
+              </button>
+              <button
+                onClick={openAddModal}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Catat Coaching
+              </button>
+            </>
           )}
         </div>
       </div>

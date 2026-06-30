@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
-import { appendSheetRow, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
 
 // 1. Save or Update Scores
 export async function saveNilaiKualitasAction(rowData: Record<string, any>) {
@@ -44,5 +44,25 @@ export async function deleteNilaiKualitasAction(rowIndex: number) {
     return { success: true, message: 'Data nilai kualitas berhasil dihapus.' };
   } else {
     return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
+  }
+}
+
+// 3. Batch Import Scores
+export async function importNilaiKualitasAction(rows: Record<string, any>[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Tidak ada data untuk di-import.' };
+  }
+
+  const success = await appendSheetRows('nilaiKualitas', rows);
+  if (success) {
+    revalidatePath('/nilai-kualitas');
+    return { success: true, message: `Berhasil meng-import ${rows.length} data nilai kualitas.` };
+  } else {
+    return { success: false, error: 'Gagal meng-import data ke Google Sheets.' };
   }
 }

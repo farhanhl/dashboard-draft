@@ -51,7 +51,7 @@ export function Sidebar({ user }: SidebarProps) {
         </div>
         <div>
           <h1 className="font-bold text-sm tracking-wide text-white leading-tight">QA Dashboard</h1>
-          <p className="text-[10px] text-blue-200">TIM 3 Management</p>
+          <p className="text-[10px] text-blue-200">TIM Management</p>
         </div>
       </div>
 

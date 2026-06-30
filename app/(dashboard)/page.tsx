@@ -34,7 +34,7 @@ export default async function DashboardPage() {
         <Topbar title="Dashboard" isDatabaseConnected={false} />
         <main className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
           <div className="max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
-            <div className="w-16 h-16 bg-blue-50 text-[#1E3A8A] rounded-2xl flex items-center justify-center mx-auto mb-6 border border-blue-100">
+            <div className="w-16 h-16 bg-blue-50 text-[#BE185D] rounded-2xl flex items-center justify-center mx-auto mb-6 border border-blue-100">
               <Database className="w-8 h-8" />
             </div>
             <h3 className="text-lg font-bold text-slate-800 mb-2">
@@ -53,14 +53,14 @@ export default async function DashboardPage() {
               {user ? (
                 <Link 
                   href="/integration" 
-                  className="px-4 py-2.5 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-md"
+                  className="px-4 py-2.5 bg-[#BE185D] hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-md"
                 >
                   {!isConnected ? "Hubungkan Google Sheets" : "Inisialisasi Spreadsheet"}
                 </Link>
               ) : (
                 <Link 
                   href="/login" 
-                  className="px-4 py-2.5 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-md"
+                  className="px-4 py-2.5 bg-[#BE185D] hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-md"
                 >
                   Login Sebagai QA
                 </Link>
@@ -333,7 +333,7 @@ export default async function DashboardPage() {
             <div className="mt-6 pt-4 border-t border-slate-100">
               <Link 
                 href="/temuan-sampling" 
-                className="flex items-center justify-between text-xs font-bold text-[#1E3A8A] hover:text-blue-700 transition-colors"
+                className="flex items-center justify-between text-xs font-bold text-[#BE185D] hover:text-blue-700 transition-colors"
               >
                 <span>Lihat Data Temuan Lengkap</span>
                 <ChevronRight className="w-4 h-4" />

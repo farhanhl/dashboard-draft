@@ -2,16 +2,16 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { 
-  authenticateQA, 
-  createSession, 
-  deleteSession, 
-  hashPassword 
+import {
+  authenticateQA,
+  createSession,
+  deleteSession,
+  hashPassword
 } from '@/lib/auth';
-import { 
-  getGoogleConfig, 
-  saveGoogleConfig, 
-  testGoogleConnection, 
+import {
+  getGoogleConfig,
+  saveGoogleConfig,
+  testGoogleConnection,
   initializeSpreadsheet,
   appendSheetRow,
   readSheetRows,
@@ -31,7 +31,7 @@ export async function loginAction(prevState: any, formData: FormData) {
     await createSession({
       id: 'user_admin_qa_1',
       email: 'admin@qa.com',
-      name: 'Admin QA TIM 3 (Default Fallback)',
+      name: 'Admin QA TIM 3',
       role: 'QA'
     });
     revalidatePath('/', 'layout');
@@ -50,7 +50,7 @@ export async function loginAction(prevState: any, formData: FormData) {
   }
 
   await createSession(result.user);
-  
+
   // Revalidate to update sidebar status
   revalidatePath('/', 'layout');
   redirect('/');
@@ -89,9 +89,9 @@ export async function updateGoogleConfigAction(formData: FormData) {
   try {
     saveGoogleConfig(config);
     revalidatePath('/', 'layout');
-    return { 
-      success: true, 
-      message: `Berhasil tersambung ke "${testRes.spreadsheetTitle}". Konfigurasi disimpan.` 
+    return {
+      success: true,
+      message: `Berhasil tersambung ke "${testRes.spreadsheetTitle}". Konfigurasi disimpan.`
     };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -132,12 +132,12 @@ export async function initializeSheetsAction() {
         role: 'QA',
         created_at: new Date().toISOString(),
       };
-      
+
       const seedRes = await appendSheetRow('users', defaultUser);
       if (seedRes) {
-        return { 
-          success: true, 
-          message: 'Spreadsheet berhasil diinisialisasi. Default QA User telah dibuat: admin@qa.com / admin123' 
+        return {
+          success: true,
+          message: 'Spreadsheet berhasil diinisialisasi. Default QA User telah dibuat: admin@qa.com / admin123'
         };
       }
     }
@@ -145,8 +145,8 @@ export async function initializeSheetsAction() {
     console.error('Failed to seed default user:', error);
   }
 
-  return { 
-    success: true, 
-    message: 'Spreadsheet berhasil diinisialisasi dan siap digunakan.' 
+  return {
+    success: true,
+    message: 'Spreadsheet berhasil diinisialisasi dan siap digunakan.'
   };
 }

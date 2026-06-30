@@ -309,7 +309,7 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
               placeholder="Cari petugas..."
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] text-slate-800"
+              className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#BE185D] text-slate-800"
             />
           </div>
 
@@ -317,7 +317,7 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
           <select
             value={selectedYear}
             onChange={(e) => { setSelectedYear(e.target.value); setCurrentPage(1); }}
-            className="px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1E3A8A] text-slate-700 font-semibold"
+            className="px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#BE185D] text-slate-700 font-semibold"
           >
             {availableYears.map(year => (
               <option key={year} value={year}>Tahun {year}</option>
@@ -355,7 +355,7 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
               </button>
               <button
                 onClick={openAddModal}
-                className="flex items-center gap-1.5 px-3 py-2 bg-[#1E3A8A] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#BE185D] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Tambah Petugas
@@ -576,7 +576,7 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#1E3A8A] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-md transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#BE185D] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-md transition-colors"
                 >
                   {isPending && <RefreshCw className="w-3 animate-spin" />}
                   Simpan Data

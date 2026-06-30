@@ -2,19 +2,19 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Percent, 
-  ClipboardList, 
-  AlertTriangle, 
-  Smile, 
-  Ticket, 
-  BookOpen, 
-  Settings2, 
-  Users, 
-  LogIn, 
-  LogOut, 
-  User 
+import {
+  LayoutDashboard,
+  Percent,
+  ClipboardList,
+  AlertTriangle,
+  Smile,
+  Ticket,
+  BookOpen,
+  Settings2,
+  Users,
+  LogIn,
+  LogOut,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { logoutAction } from '@/app/actions/auth';
@@ -43,7 +43,7 @@ export function Sidebar({ user }: SidebarProps) {
   ];
 
   return (
-    <aside className="w-64 bg-[#1E3A8A] text-slate-100 flex flex-col h-screen shrink-0 border-r border-blue-900/50 shadow-lg">
+    <aside className="w-64 bg-[#BE185D] text-slate-100 flex flex-col h-screen shrink-0 border-r border-blue-900/50 shadow-lg">
       {/* Brand Header */}
       <div className="p-6 border-b border-blue-900/50 flex items-center gap-3">
         <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center shadow-md">
@@ -69,8 +69,8 @@ export function Sidebar({ user }: SidebarProps) {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150",
-                    isActive 
-                      ? "bg-blue-800 text-white shadow-inner" 
+                    isActive
+                      ? "bg-blue-800 text-white shadow-inner"
                       : "text-blue-100/70 hover:bg-blue-800/40 hover:text-white"
                   )}
                 >
@@ -96,8 +96,8 @@ export function Sidebar({ user }: SidebarProps) {
                     href={item.href}
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150",
-                      isActive 
-                        ? "bg-blue-800 text-white shadow-inner" 
+                      isActive
+                        ? "bg-blue-800 text-white shadow-inner"
                         : "text-blue-100/70 hover:bg-blue-800/40 hover:text-white"
                     )}
                   >
@@ -112,7 +112,7 @@ export function Sidebar({ user }: SidebarProps) {
       </div>
 
       {/* Sidebar Footer (User session / Login) */}
-      <div className="p-4 border-t border-blue-900/50 bg-[#172E70]">
+      <div className="p-4 border-t border-blue-900/50 bg-[#BE185D]">
         {user ? (
           <div className="space-y-3">
             <div className="flex items-center gap-3 px-2 py-1">
@@ -126,7 +126,7 @@ export function Sidebar({ user }: SidebarProps) {
                 </span>
               </div>
             </div>
-            
+
             <form action={logoutAction}>
               <button
                 type="submit"

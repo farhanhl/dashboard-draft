@@ -1,8 +1,29 @@
 @import "tailwindcss";
 
+@theme {
+  /* Override blue palette to gorgeous girly pink/rose palette */
+  --color-blue-50: #fdf2f8;    /* pink-50 */
+  --color-blue-100: #fce7f3;   /* pink-100 */
+  --color-blue-200: #fbcfe8;   /* pink-200 */
+  --color-blue-300: #f9a8d4;   /* pink-300 */
+  --color-blue-400: #f472b6;   /* pink-400 */
+  --color-blue-500: #ec4899;   /* pink-500 */
+  --color-blue-600: #db2777;   /* pink-600 */
+  --color-blue-700: #be185d;   /* pink-700 */
+  --color-blue-800: #9d174d;   /* pink-800 */
+  --color-blue-900: #831843;   /* pink-900 */
+  --color-blue-950: #500724;   /* pink-950 */
+
+  /* Override slate colors to light rose/pink tones for girly aesthetic */
+  --color-slate-50: #fff6f8;   /* very soft rose */
+  --color-slate-100: #ffe4e9;  /* soft rose border */
+  --color-slate-200: #fbcfe8;  /* pink-200 */
+  --color-slate-300: #f9a8d4;  /* pink-300 */
+}
+
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #fffbfe;
+  --foreground: #4c0519;
 }
 
 body {

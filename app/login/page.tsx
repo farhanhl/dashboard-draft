@@ -23,7 +23,7 @@ export default function LoginPage() {
 
         {/* Brand Header */}
         <div className="text-center">
-          <div className="w-12 h-12 rounded-xl bg-[#1E3A8A] flex items-center justify-center mx-auto mb-4 shadow-md">
+          <div className="w-12 h-12 rounded-xl bg-[#BE185D] flex items-center justify-center mx-auto mb-4 shadow-md">
             <span className="font-extrabold text-white text-lg">QA</span>
           </div>
           <h2 className="text-xl font-bold text-slate-800">Login QA Administrator</h2>
@@ -79,7 +79,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isPending}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#1E3A8A] hover:bg-blue-700 text-white text-sm font-bold transition-all shadow-md disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#BE185D] hover:bg-blue-700 text-white text-sm font-bold transition-all shadow-md disabled:opacity-50"
           >
             {isPending ? (
               <>

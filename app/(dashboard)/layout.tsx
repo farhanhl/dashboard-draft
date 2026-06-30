@@ -17,7 +17,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFC]">
+    <div className="flex h-screen w-screen overflow-hidden bg-blue-50">
       {/* Sidebar Navigation */}
       <Sidebar user={user} />
 

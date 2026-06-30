@@ -151,7 +151,7 @@ export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormPr
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <Database className="w-4 h-4 text-[#1E3A8A]" />
+            <Database className="w-4 h-4 text-[#BE185D]" />
             Konfigurasi Google Sheets API
           </h3>
           <div className="text-[10px] text-slate-400 font-semibold">
@@ -217,7 +217,7 @@ export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormPr
             <button
               type="submit"
               disabled={isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-[#1E3A8A] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-md"
+              className="flex items-center gap-2 px-4 py-2 bg-[#BE185D] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-md"
             >
               {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               Simpan & Hubungkan

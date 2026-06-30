@@ -98,9 +98,9 @@ export async function updateGoogleConfigAction(formData: FormData) {
   }
 }
 
-// 4. Test active connection
-export async function testConnectionAction() {
-  const config = getGoogleConfig();
+// 4. Test active connection or custom config
+export async function testConnectionAction(configParam?: GoogleConfig) {
+  const config = configParam || getGoogleConfig();
   if (!config) {
     return { success: false, error: 'Google Sheets belum dikonfigurasi.' };
   }

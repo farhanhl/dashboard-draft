@@ -96,9 +96,9 @@ export function saveGoogleConfig(config: GoogleConfig): void {
     };
 
     fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(formattedConfig, null, 2), 'utf-8');
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error saving credentials file:', error);
-    throw new Error('Gagal menyimpan berkas konfigurasi Google.');
+    throw new Error(`Gagal menyimpan berkas konfigurasi Google: ${error.message || error}`);
   }
 }
 

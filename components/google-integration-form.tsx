@@ -60,8 +60,19 @@ export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormPr
     setInitResult(null);
     setSaveResult(null);
 
+    if (!spreadsheetId || !clientEmail || !privateKey) {
+      setTestResult({ success: false, error: 'Semua field wajib diisi sebelum menguji koneksi.' });
+      return;
+    }
+
+    const config: GoogleConfig = {
+      spreadsheetId: spreadsheetId.trim(),
+      clientEmail: clientEmail.trim(),
+      privateKey: privateKey,
+    };
+
     startTransition(async () => {
-      const res = await testConnectionAction();
+      const res = await testConnectionAction(config);
       if (res.success) {
         setTestResult({ success: true, title: res.spreadsheetTitle });
       } else {
@@ -212,28 +223,26 @@ export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormPr
               Simpan & Hubungkan
             </button>
 
-            {initialConfig && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleTestConnection}
-                  disabled={isPending}
-                  className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-xs font-bold transition-all"
-                >
-                  {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                  Uji Koneksi
-                </button>
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              disabled={isPending}
+              className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-xs font-bold transition-all"
+            >
+              {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Uji Koneksi
+            </button>
 
-                <button
-                  type="button"
-                  onClick={handleInitializeSheets}
-                  disabled={isPending}
-                  className="flex items-center gap-2 px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 rounded-lg text-xs font-bold transition-all"
-                >
-                  {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                  Inisialisasi Spreadsheet
-                </button>
-              </>
+            {initialConfig && (
+              <button
+                type="button"
+                onClick={handleInitializeSheets}
+                disabled={isPending}
+                className="flex items-center gap-2 px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 rounded-lg text-xs font-bold transition-all"
+              >
+                {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                Inisialisasi Spreadsheet
+              </button>
             )}
           </div>
         </form>

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveTemuanSamplingAction, deleteTemuanSamplingAction, importTemuanSamplingAction } from '@/app/actions/temuan';
+import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 
 interface TemuanSamplingTableProps {
   data: any[];
@@ -35,9 +36,84 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
 
   // Import State & Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [showSheetModal, setShowSheetModal] = useState(false);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const processImportRows = (json: any[]): any[] => {
+    return json.map(row => {
+      const mapped: any = {};
+      
+      const petugasKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'nama petugas' || 
+        k.toLowerCase() === 'petugas_name' || 
+        k.toLowerCase() === 'nama' ||
+        k.toLowerCase() === 'petugas'
+      );
+      mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
+
+      const tglTransKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'tanggal transaksi' || 
+        k.toLowerCase() === 'tanggal_transaksi' ||
+        k.toLowerCase() === 'tgl transaksi'
+      );
+      mapped.tanggal_transaksi = tglTransKey ? String(row[tglTransKey]).trim() : '';
+
+      const tglSampKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'tanggal sampling' || 
+        k.toLowerCase() === 'tanggal_sampling' ||
+        k.toLowerCase() === 'tgl sampling'
+      );
+      mapped.tanggal_sampling = tglSampKey ? String(row[tglSampKey]).trim() : '';
+
+      const weekKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'pekan (week)' || 
+        k.toLowerCase() === 'pekan' ||
+        k.toLowerCase() === 'week'
+      );
+      mapped.week = weekKey ? String(row[weekKey]).trim() : '1';
+
+      // Indicators
+      const indicatorsMap: Record<string, string[]> = {
+        etika_salam: ['salam pembuka', 'etika_salam'],
+        etika_ramah: ['sopan santun', 'etika_ramah'],
+        etika_bahasa: ['tata bahasa', 'etika_bahasa'],
+        keterampilan_menulis: ['keterampilan menulis', 'keterampilan_menulis'],
+        keterampilan_analisis: ['keterampilan analisis', 'keterampilan_analisis'],
+        prosedur_informasi: ['kesesuaian informasi', 'prosedur_informasi'],
+        prosedur_proses: ['kesesuaian prosedur', 'prosedur_proses'],
+        prosedur_tiket: ['kesesuaian tiket', 'prosedur_tiket']
+      };
+
+      Object.entries(indicatorsMap).forEach(([dbField, aliases]) => {
+        const rowKey = Object.keys(row).find(k => 
+          aliases.includes(k.toLowerCase())
+        );
+        if (rowKey !== undefined) {
+          const numVal = parseInt(String(row[rowKey]).replace('%', '').trim());
+          mapped[dbField] = isNaN(numVal) ? 100 : numVal;
+        } else {
+          mapped[dbField] = 100;
+        }
+      });
+
+      const temuanKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'temuan' ||
+        k.toLowerCase() === 'keterangan temuan'
+      );
+      mapped.temuan = temuanKey ? String(row[temuanKey]).trim() : '';
+
+      const rekKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'rekomendasi' ||
+        k.toLowerCase() === 'rekomendasi / rencana aksi'
+      );
+      mapped.rekomendasi = rekKey ? String(row[rekKey]).trim() : '';
+
+      return mapped;
+    }).filter(r => r.petugas_name);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,76 +134,7 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
           return;
         }
 
-        const mappedRows = json.map(row => {
-          const mapped: any = {};
-          
-          const petugasKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'nama petugas' || 
-            k.toLowerCase() === 'petugas_name' || 
-            k.toLowerCase() === 'nama' ||
-            k.toLowerCase() === 'petugas'
-          );
-          mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
-
-          const tglTransKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'tanggal transaksi' || 
-            k.toLowerCase() === 'tanggal_transaksi' ||
-            k.toLowerCase() === 'tgl transaksi'
-          );
-          mapped.tanggal_transaksi = tglTransKey ? String(row[tglTransKey]).trim() : '';
-
-          const tglSampKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'tanggal sampling' || 
-            k.toLowerCase() === 'tanggal_sampling' ||
-            k.toLowerCase() === 'tgl sampling'
-          );
-          mapped.tanggal_sampling = tglSampKey ? String(row[tglSampKey]).trim() : '';
-
-          const weekKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'pekan (week)' || 
-            k.toLowerCase() === 'pekan' ||
-            k.toLowerCase() === 'week'
-          );
-          mapped.week = weekKey ? String(row[weekKey]).trim() : '1';
-
-          // Indicators
-          const indicatorsMap: Record<string, string[]> = {
-            etika_salam: ['salam pembuka', 'etika_salam'],
-            etika_ramah: ['sopan santun', 'etika_ramah'],
-            etika_bahasa: ['tata bahasa', 'etika_bahasa'],
-            keterampilan_menulis: ['keterampilan menulis', 'keterampilan_menulis'],
-            keterampilan_analisis: ['keterampilan analisis', 'keterampilan_analisis'],
-            prosedur_informasi: ['kesesuaian informasi', 'prosedur_informasi'],
-            prosedur_proses: ['kesesuaian prosedur', 'prosedur_proses'],
-            prosedur_tiket: ['kesesuaian tiket', 'prosedur_tiket']
-          };
-
-          Object.entries(indicatorsMap).forEach(([dbField, aliases]) => {
-            const rowKey = Object.keys(row).find(k => 
-              aliases.includes(k.toLowerCase())
-            );
-            if (rowKey !== undefined) {
-              const numVal = parseInt(String(row[rowKey]).replace('%', '').trim());
-              mapped[dbField] = isNaN(numVal) ? 100 : numVal;
-            } else {
-              mapped[dbField] = 100;
-            }
-          });
-
-          const temuanKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'temuan' ||
-            k.toLowerCase() === 'keterangan temuan'
-          );
-          mapped.temuan = temuanKey ? String(row[temuanKey]).trim() : '';
-
-          const rekKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'rekomendasi' ||
-            k.toLowerCase() === 'rekomendasi / rencana aksi'
-          );
-          mapped.rekomendasi = rekKey ? String(row[rekKey]).trim() : '';
-
-          return mapped;
-        }).filter(r => r.petugas_name);
+        const mappedRows = processImportRows(json);
 
         if (mappedRows.length === 0) {
           alert('Tidak ada data petugas yang valid ditemukan.');
@@ -150,6 +157,34 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
+  };
+
+  const handleSheetImport = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      try {
+        const csvData = await fetchSheetCsv(sheetUrl);
+        const csvText = new TextDecoder().decode(csvData);
+        const workbook = XLSX.read(csvText, { type: 'string' });
+        const json = XLSX.utils.sheet_to_json<any>(workbook.Sheets[workbook.SheetNames[0]]);
+        const mappedRows = processImportRows(json);
+
+        if (mappedRows.length === 0) {
+          alert('Tidak ada data petugas yang valid ditemukan.');
+          return;
+        }
+
+        const res = await importTemuanSamplingAction(mappedRows);
+        if (res.success) {
+          alert(res.message);
+          setShowSheetModal(false);
+        } else {
+          alert(res.error);
+        }
+      } catch (err) {
+        alert('Gagal mengambil data dari Google Sheet.');
+      }
+    });
   };
 
   // CRUD & Details States
@@ -423,6 +458,15 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
               >
                 <Upload className="w-3.5 h-3.5" />
                 Import Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSheetModal(true)}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Spreadsheet
               </button>
               <button
                 onClick={openAddModal}
@@ -780,6 +824,51 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
                 >
                   {isPending && <RefreshCw className="w-3 animate-spin" />}
                   Simpan Temuan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showSheetModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800">Import dari Google Spreadsheet</h3>
+              <button onClick={() => setShowSheetModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSheetImport}>
+              <div className="p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase block">URL Google Sheet (public)</label>
+                  <input
+                    type="text"
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    value={sheetUrl}
+                    onChange={(e) => setSheetUrl(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-slate-800"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSheetModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#BE185D] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-md transition-colors"
+                >
+                  {isPending && <RefreshCw className="w-3 animate-spin" />}
+                  Import
                 </button>
               </div>
             </form>

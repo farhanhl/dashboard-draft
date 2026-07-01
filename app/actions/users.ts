@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser, hashPassword } from '@/lib/auth';
-import { appendSheetRow, updateSheetRow, deleteSheetRow, readSheetRows } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow, readSheetRows } from '@/lib/google-sheets';
 
 // 1. Add or Update User
 export async function saveUserAction(rowData: Record<string, any>) {
@@ -122,5 +122,56 @@ export async function deleteUserAction(rowIndex: number, userIdToDelete: string)
     return { success: true, message: 'Pengguna berhasil dihapus.' };
   } else {
     return { success: false, error: 'Gagal menghapus pengguna dari Google Sheets.' };
+  }
+}
+
+// 4. Batch Import Users
+export async function importUsersAction(rows: Record<string, any>[]) {
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  if (rows.length === 0) {
+    return { success: false, error: 'Tidak ada data untuk di-import.' };
+  }
+
+  // Read current users to avoid duplicate email insertion
+  const currentUsers = await readSheetRows<any>('users');
+  const existingEmails = new Set(
+    currentUsers.map(u => String(u.email).toLowerCase())
+  );
+
+  const preparedRows: any[] = [];
+  for (const row of rows) {
+    if (!row.email) continue;
+    
+    // Check if duplicate email in existing db or within the imported sheet
+    const emailLower = String(row.email).toLowerCase();
+    if (existingEmails.has(emailLower)) continue;
+    existingEmails.add(emailLower);
+
+    const password = row.password || 'user123';
+    
+    preparedRows.push({
+      id: row.id || `user_${crypto.randomUUID()}`,
+      email: row.email,
+      name: row.name || emailLower.split('@')[0],
+      role: row.role || 'QA',
+      password_hash: hashPassword(password),
+      created_at: row.created_at || new Date().toISOString(),
+    });
+  }
+
+  if (preparedRows.length === 0) {
+    return { success: false, error: 'Semua pengguna dalam list sudah terdaftar.' };
+  }
+
+  const success = await appendSheetRows('users', preparedRows);
+  if (success) {
+    revalidatePath('/users');
+    return { success: true, message: `Berhasil meng-import ${preparedRows.length} pengguna baru.` };
+  } else {
+    return { success: false, error: 'Gagal meng-import pengguna ke Google Sheets.' };
   }
 }

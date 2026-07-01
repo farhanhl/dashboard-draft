@@ -42,6 +42,69 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
     fileInputRef.current?.click();
   };
 
+  const processImportRows = (json: any[]): any[] => {
+    return json.map(row => {
+      const mapped: any = {};
+      
+      const petugasKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'nama petugas' || 
+        k.toLowerCase() === 'petugas_name' || 
+        k.toLowerCase() === 'nama' ||
+        k.toLowerCase() === 'petugas'
+      );
+      mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
+
+      const kodeTiketKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'kode tiket' || 
+        k.toLowerCase() === 'kode_tiket' ||
+        k.toLowerCase() === 'tiket'
+      );
+      mapped.kode_tiket = kodeTiketKey ? String(row[kodeTiketKey]).trim() : '';
+
+      const tglTemuanKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'tanggal temuan' || 
+        k.toLowerCase() === 'tanggal_temuan' ||
+        k.toLowerCase() === 'tgl temuan'
+      );
+      mapped.tanggal_temuan = tglTemuanKey ? String(row[tglTemuanKey]).trim() : '';
+
+      const sumberKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'sumber' || 
+        k.toLowerCase() === 'sumber temuan'
+      );
+      mapped.sumber = sumberKey ? String(row[sumberKey]).trim() : '';
+
+      const risikoKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'risiko' || 
+        k.toLowerCase() === 'resiko'
+      );
+      let rawRisiko = risikoKey ? String(row[risikoKey]).trim() : 'Sedang';
+      if (rawRisiko) {
+        rawRisiko = rawRisiko.charAt(0).toUpperCase() + rawRisiko.slice(1).toLowerCase();
+      }
+      if (!['Rendah', 'Sedang', 'Tinggi'].includes(rawRisiko)) {
+        rawRisiko = 'Sedang';
+      }
+      mapped.risiko = rawRisiko;
+
+      const keteranganKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'keterangan temuan' || 
+        k.toLowerCase() === 'keterangan_temuan' ||
+        k.toLowerCase() === 'keterangan' ||
+        k.toLowerCase() === 'temuan'
+      );
+      mapped.keterangan_temuan = keteranganKey ? String(row[keteranganKey]).trim() : '';
+
+      const rekKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'rekomendasi' ||
+        k.toLowerCase() === 'rekomendasi / rencana aksi'
+      );
+      mapped.rekomendasi = rekKey ? String(row[rekKey]).trim() : '';
+
+      return mapped;
+    }).filter(r => r.petugas_name);
+  };
+
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -60,66 +123,7 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
           return;
         }
 
-        const mappedRows = json.map(row => {
-          const mapped: any = {};
-          
-          const petugasKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'nama petugas' || 
-            k.toLowerCase() === 'petugas_name' || 
-            k.toLowerCase() === 'nama' ||
-            k.toLowerCase() === 'petugas'
-          );
-          mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
-
-          const kodeTiketKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'kode tiket' || 
-            k.toLowerCase() === 'kode_tiket' ||
-            k.toLowerCase() === 'tiket'
-          );
-          mapped.kode_tiket = kodeTiketKey ? String(row[kodeTiketKey]).trim() : '';
-
-          const tglTemuanKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'tanggal temuan' || 
-            k.toLowerCase() === 'tanggal_temuan' ||
-            k.toLowerCase() === 'tgl temuan'
-          );
-          mapped.tanggal_temuan = tglTemuanKey ? String(row[tglTemuanKey]).trim() : '';
-
-          const sumberKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'sumber' || 
-            k.toLowerCase() === 'sumber temuan'
-          );
-          mapped.sumber = sumberKey ? String(row[sumberKey]).trim() : '';
-
-          const risikoKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'risiko' || 
-            k.toLowerCase() === 'resiko'
-          );
-          let rawRisiko = risikoKey ? String(row[risikoKey]).trim() : 'Sedang';
-          if (rawRisiko) {
-            rawRisiko = rawRisiko.charAt(0).toUpperCase() + rawRisiko.slice(1).toLowerCase();
-          }
-          if (!['Rendah', 'Sedang', 'Tinggi'].includes(rawRisiko)) {
-            rawRisiko = 'Sedang';
-          }
-          mapped.risiko = rawRisiko;
-
-          const keteranganKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'keterangan temuan' || 
-            k.toLowerCase() === 'keterangan_temuan' ||
-            k.toLowerCase() === 'keterangan' ||
-            k.toLowerCase() === 'temuan'
-          );
-          mapped.keterangan_temuan = keteranganKey ? String(row[keteranganKey]).trim() : '';
-
-          const rekKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'rekomendasi' ||
-            k.toLowerCase() === 'rekomendasi / rencana aksi'
-          );
-          mapped.rekomendasi = rekKey ? String(row[rekKey]).trim() : '';
-
-          return mapped;
-        }).filter(r => r.petugas_name);
+        const mappedRows = processImportRows(json);
 
         if (mappedRows.length === 0) {
           alert('Tidak ada data petugas yang valid ditemukan.');
@@ -142,6 +146,34 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
+  };
+
+  const handleSheetImport = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      try {
+        const csvData = await fetchSheetCsv(sheetUrl);
+        const csvText = new TextDecoder().decode(csvData);
+        const workbook = XLSX.read(csvText, { type: 'string' });
+        const json = XLSX.utils.sheet_to_json<any>(workbook.Sheets[workbook.SheetNames[0]]);
+        const mappedRows = processImportRows(json);
+
+        if (mappedRows.length === 0) {
+          alert('Tidak ada data petugas yang valid ditemukan.');
+          return;
+        }
+
+        const res = await importTemuanEksternalAction(mappedRows);
+        if (res.success) {
+          alert(res.message);
+          setShowSheetModal(false);
+        } else {
+          alert(res.error);
+        }
+      } catch (err) {
+        alert('Gagal mengambil data dari Google Sheet.');
+      }
+    });
   };
 
   // CRUD & Details States
@@ -354,19 +386,6 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
             <Download className="w-3.5 h-3.5" />
             Export Excel
           </button>
-          {isQA && (
-            <>
-              <button
-                type="button"
-                onClick={() => setShowSheetModal(true)}
-                disabled={isPending}
-                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
-              >
-                <Upload className="w-3.5 h-3.5" />
-                Import Spreadsheet
-              </button>
-            </>
-          )}
           
           {isQA && (
             <>
@@ -385,6 +404,15 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
               >
                 <Upload className="w-3.5 h-3.5" />
                 Import Excel
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSheetModal(true)}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Spreadsheet
               </button>
               <button
                 onClick={openAddModal}
@@ -690,6 +718,51 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
                 >
                   {isPending && <RefreshCw className="w-3 animate-spin" />}
                   Simpan Temuan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showSheetModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800">Import dari Google Spreadsheet</h3>
+              <button onClick={() => setShowSheetModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSheetImport}>
+              <div className="p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase block">URL Google Sheet (public)</label>
+                  <input
+                    type="text"
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    value={sheetUrl}
+                    onChange={(e) => setSheetUrl(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-slate-800"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSheetModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#BE185D] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-md transition-colors"
+                >
+                  {isPending && <RefreshCw className="w-3 animate-spin" />}
+                  Import
                 </button>
               </div>
             </form>

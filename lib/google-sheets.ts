@@ -34,6 +34,12 @@ export interface GoogleConnection {
   active: boolean;
 }
 
+export const TICKET_CATEGORIES = [
+  'PTNP', 'PBPU', 'ATNP', 'APBI', 'APPU', 'ABPU', 'MBPU', 'MTBU', 
+  'PNAK', 'PNGL', 'PNPBL', 'PNWL', 'PNDG', 'PPHK', 'PRID', 'PRHP', 
+  'PRGL', 'UFTP', 'UTPL', 'UTPK', 'NMNG', 'UBKK', 'NKLN', 'UKLS', 'UPVA'
+];
+
 const DEFAULT_SHEET_NAMES = {
   config: 'Config',
   users: 'Users',
@@ -761,7 +767,7 @@ export async function initializeSpreadsheet(config: GoogleConfig): Promise<{ suc
       ],
       temuanEksternal: ['id', 'petugas_name', 'kode_tiket', 'tanggal_temuan', 'sumber', 'risiko', 'keterangan_temuan', 'rekomendasi', 'created_at'],
       surveyKepuasan: ['petugas_name', 'year', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'],
-      listTicketSampling: ['petugas_name', 'category', 'year', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'],
+      listTicketSampling: ['petugas_name', 'year', ...TICKET_CATEGORIES],
       coaching: ['id', 'petugas_name', 'bulan', 'temuan', 'rekomendasi', 'created_at'],
     };
 
@@ -803,8 +809,13 @@ export async function initializeSpreadsheet(config: GoogleConfig): Promise<{ suc
       });
 
       const currentHeaders = currentHeaderRes.data.values?.[0];
-      if (!currentHeaders || currentHeaders.length === 0) {
-        // Write headers since they are missing
+      const isHeaderMismatched = currentHeaders && (
+        currentHeaders.length !== task.headers.length ||
+        task.headers.some((h, index) => currentHeaders[index] !== h)
+      );
+
+      if (!currentHeaders || currentHeaders.length === 0 || isHeaderMismatched) {
+        // Write headers since they are missing or mismatched
         await sheets.spreadsheets.values.update({
           spreadsheetId: config.spreadsheetId,
           range: `${task.title}!A1`,

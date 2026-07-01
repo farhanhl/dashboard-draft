@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
-import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow, deleteSheetRows } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow, deleteSheetRows, TICKET_CATEGORIES } from '@/lib/google-sheets';
 
 // --- SURVEY KEPUASAN ACTIONS ---
 
@@ -80,11 +80,10 @@ export async function saveTicketSamplingAction(rowData: Record<string, any>) {
   const { __rowIndex, ...cleanRow } = rowData;
   const rowIndex = Number(__rowIndex);
 
-  // Normalize monthly values to TRUE/FALSE
-  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-  months.forEach(m => {
-    if (cleanRow[m] !== undefined) {
-      cleanRow[m] = cleanRow[m] === true || String(cleanRow[m]).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
+  // Normalize category values to TRUE/FALSE
+  TICKET_CATEGORIES.forEach(cat => {
+    if (cleanRow[cat] !== undefined) {
+      cleanRow[cat] = cleanRow[cat] === true || String(cleanRow[cat]).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
     }
   });
 
@@ -177,14 +176,13 @@ export async function importTicketSamplingAction(rows: Record<string, any>[]) {
     return { success: false, error: 'Tidak ada data untuk di-import.' };
   }
 
-  const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
   const preparedRows = rows.map(row => {
     const cleanRow = { ...row };
-    months.forEach(m => {
-      if (cleanRow[m] !== undefined) {
-        cleanRow[m] = cleanRow[m] === true || String(cleanRow[m]).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
+    TICKET_CATEGORIES.forEach(cat => {
+      if (cleanRow[cat] !== undefined) {
+        cleanRow[cat] = cleanRow[cat] === true || String(cleanRow[cat]).toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE';
       } else {
-        cleanRow[m] = 'FALSE';
+        cleanRow[cat] = 'FALSE';
       }
     });
     return cleanRow;

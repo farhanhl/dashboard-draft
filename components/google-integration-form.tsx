@@ -26,7 +26,8 @@ import {
   Cloud,
   Key,
   FileSpreadsheet,
-  Settings
+  Settings,
+  ExternalLink
 } from 'lucide-react';
 import { GoogleConfig, GoogleConnection } from '@/lib/google-sheets';
 
@@ -310,6 +311,18 @@ export function GoogleIntegrationForm({ initialConfig, initialConnections }: Goo
                         <div className="text-[10px] text-slate-400 font-mono line-clamp-1">
                           ID: {conn.spreadsheetId.substring(0, 10)}...
                         </div>
+                        {conn.spreadsheetId && (
+                          <a
+                            href={`https://docs.google.com/spreadsheets/d/${conn.spreadsheetId}/edit`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 hover:underline"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            Buka Spreadsheet
+                          </a>
+                        )}
                       </div>
                       
                       {/* Hover / Actions */}

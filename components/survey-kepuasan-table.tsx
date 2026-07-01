@@ -11,7 +11,9 @@ import {
   RefreshCw, 
   CheckSquare, 
   Square,
-  AlertCircle 
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
@@ -28,6 +30,10 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
   const [isPending, startTransition] = useTransition();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [sortField, setSortField] = useState('petugas_name');
+  const [sortAsc, setSortAsc] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
   // Import State & Ref
@@ -180,6 +186,44 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
     const matchesYear = row.year ? String(row.year) === selectedYear : true;
     return matchesSearch && matchesYear;
   });
+
+
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortField(field);
+      setSortAsc(true);
+    }
+    setCurrentPage(1);
+  };
+
+  // Sort
+  const sortedData = [...filteredData].sort((a, b) => {
+    let aVal = a[sortField] || '';
+    let bVal = b[sortField] || '';
+
+    if (months.includes(sortField)) {
+      const aBool = aVal === 'TRUE' || aVal === true ? 1 : 0;
+      const bBool = bVal === 'TRUE' || bVal === true ? 1 : 0;
+      return sortAsc ? aBool - bBool : bBool - aBool;
+    }
+
+    if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+    if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+
+    if (aVal < bVal) return sortAsc ? -1 : 1;
+    if (aVal > bVal) return sortAsc ? 1 : -1;
+    return 0;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  const paginatedData = sortedData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const visibleRowIndices = filteredData.map(row => Number(row.__rowIndex));
   const isAllSelected = filteredData.length > 0 && filteredData.every(row => selectedRows.includes(Number(row.__rowIndex)));
@@ -417,16 +461,27 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                     />
                   </th>
                 )}
-                <th className="px-6 py-4">Nama Petugas</th>
-                {monthLabels.map(m => (
-                  <th key={m} className="px-3 py-4 text-center">{m}</th>
+                <th 
+                  onClick={() => handleSort('petugas_name')}
+                  className="px-6 py-4 cursor-pointer select-none hover:bg-slate-100/50 transition-colors"
+                >
+                  Nama Petugas {sortField === 'petugas_name' && (sortAsc ? '▲' : '▼')}
+                </th>
+                {monthLabels.map((m, idx) => (
+                  <th 
+                    key={m} 
+                    onClick={() => handleSort(months[idx])}
+                    className="px-3 py-4 text-center cursor-pointer select-none hover:bg-slate-100/50 transition-colors"
+                  >
+                    {m} {sortField === months[idx] && (sortAsc ? '▲' : '▼')}
+                  </th>
                 ))}
                 {isQA && <th className="px-6 py-4 text-right">Aksi</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
-              {filteredData.length > 0 ? (
-                filteredData.map((row) => (
+              {paginatedData.length > 0 ? (
+                paginatedData.map((row) => (
                   <tr key={row.__rowIndex} className="hover:bg-slate-50/50 transition-colors">
                     {isQA && (
                       <td className="px-4 py-4 text-center w-12">
@@ -479,7 +534,7 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                 ))
               ) : (
                 <tr>
-                  <td colSpan={isQA ? 15 : 14} className="text-center py-10 text-slate-400">
+                  <td colSpan={isQA ? 15 : 13} className="text-center py-10 text-slate-400">
                     Tidak ada data checklist survey kepuasan untuk tahun {selectedYear}
                   </td>
                 </tr>
@@ -487,6 +542,55 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
             </tbody>
           </table>
         </div>
+
+        {/* Pagination bar */}
+        {filteredData.length > 0 && (
+          <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-[11px] text-slate-500 font-semibold">
+              <span>
+                Menampilkan {Math.min(filteredData.length, (currentPage - 1) * itemsPerPage + 1)} - {Math.min(filteredData.length, currentPage * itemsPerPage)} dari {filteredData.length} data
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span>Baris per halaman:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-[#BE185D] font-bold"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-bold px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
+                  {currentPage} / {totalPages}
+                </span>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showModal && (

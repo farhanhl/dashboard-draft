@@ -93,10 +93,19 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
           aliases.includes(k.toLowerCase())
         );
         if (rowKey !== undefined) {
-          const numVal = parseInt(String(row[rowKey]).replace('%', '').trim());
-          mapped[dbField] = isNaN(numVal) ? 100 : numVal;
+          const valStr = String(row[rowKey]).trim().toUpperCase();
+          if (valStr === 'N/A') {
+            mapped[dbField] = 'N/A';
+          } else {
+            const numVal = parseInt(valStr);
+            if (!isNaN(numVal) && numVal >= 0 && numVal <= 3) {
+              mapped[dbField] = String(numVal);
+            } else {
+              mapped[dbField] = '3';
+            }
+          }
         } else {
-          mapped[dbField] = 100;
+          mapped[dbField] = '3';
         }
       });
 
@@ -202,11 +211,11 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
   const [formTemuan, setFormTemuan] = useState('');
   const [formRekomendasi, setFormRekomendasi] = useState('');
   
-  // Indicator scores (default 100)
-  const [indicators, setIndicators] = useState<Record<string, number>>({
-    etika_salam: 100, etika_ramah: 100, etika_bahasa: 100,
-    keterampilan_menulis: 100, keterampilan_analisis: 100,
-    prosedur_informasi: 100, prosedur_proses: 100, prosedur_tiket: 100
+  // Indicator scores (default '3')
+  const [indicators, setIndicators] = useState<Record<string, string>>({
+    etika_salam: '3', etika_ramah: '3', etika_bahasa: '3',
+    keterampilan_menulis: '3', keterampilan_analisis: '3',
+    prosedur_informasi: '3', prosedur_proses: '3', prosedur_tiket: '3'
   });
 
   // Unique weeks list
@@ -214,19 +223,40 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
     .map(Number)
     .sort((a, b) => a - b);
 
-  // Compute Total score for indicators
+  // Compute Total score for indicators using new weights and 0,1,2,3,N/A scale
   const calculateTotalScore = (row: any) => {
-    const fields = [
-      'etika_salam', 'etika_ramah', 'etika_bahasa',
-      'keterampilan_menulis', 'keterampilan_analisis',
-      'prosedur_informasi', 'prosedur_proses', 'prosedur_tiket'
-    ];
-    let sum = 0;
-    fields.forEach(f => {
-      const val = parseFloat(row[f]);
-      sum += isNaN(val) ? 100 : val;
+    const weights: Record<string, number> = {
+      etika_salam: 0.05,
+      etika_ramah: 0.05,
+      etika_bahasa: 0.10,
+      keterampilan_menulis: 0.15,
+      keterampilan_analisis: 0.15,
+      prosedur_informasi: 0.20,
+      prosedur_proses: 0.25,
+      prosedur_tiket: 0.05,
+    };
+
+    let totalWeightedScore = 0;
+
+    Object.entries(weights).forEach(([field, weight]) => {
+      const rawVal = row[field];
+      let score = 3; // Default to N/A (which is treated as 3)
+
+      if (rawVal !== undefined && rawVal !== null) {
+        const valStr = String(rawVal).trim().toUpperCase();
+        if (valStr !== 'N/A') {
+          const valNum = parseFloat(valStr);
+          if (!isNaN(valNum)) {
+            score = valNum;
+          }
+        }
+      }
+
+      // Each indicator score is normalized out of 3, then multiplied by its weight
+      totalWeightedScore += (score / 3) * weight;
     });
-    return Math.round(sum / fields.length);
+
+    return Math.round(totalWeightedScore * 100);
   };
 
   // Filter data
@@ -312,9 +342,9 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
     setFormTemuan('');
     setFormRekomendasi('');
     setIndicators({
-      etika_salam: 100, etika_ramah: 100, etika_bahasa: 100,
-      keterampilan_menulis: 100, keterampilan_analisis: 100,
-      prosedur_informasi: 100, prosedur_proses: 100, prosedur_tiket: 100
+      etika_salam: '3', etika_ramah: '3', etika_bahasa: '3',
+      keterampilan_menulis: '3', keterampilan_analisis: '3',
+      prosedur_informasi: '3', prosedur_proses: '3', prosedur_tiket: '3'
     });
     setErrorMessage('');
     setShowModal(true);
@@ -329,15 +359,22 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
     setFormWeek(String(row.week || 1));
     setFormTemuan(row.temuan || '');
     setFormRekomendasi(row.rekomendasi || '');
+    
+    const parseScore = (val: any) => {
+      if (val === undefined || val === null) return '3';
+      const valStr = String(val).trim().toUpperCase();
+      return valStr || '3';
+    };
+
     setIndicators({
-      etika_salam: Number(row.etika_salam) ?? 100,
-      etika_ramah: Number(row.etika_ramah) ?? 100,
-      etika_bahasa: Number(row.etika_bahasa) ?? 100,
-      keterampilan_menulis: Number(row.keterampilan_menulis) ?? 100,
-      keterampilan_analisis: Number(row.keterampilan_analisis) ?? 100,
-      prosedur_informasi: Number(row.prosedur_informasi) ?? 100,
-      prosedur_proses: Number(row.prosedur_proses) ?? 100,
-      prosedur_tiket: Number(row.prosedur_tiket) ?? 100,
+      etika_salam: parseScore(row.etika_salam),
+      etika_ramah: parseScore(row.etika_ramah),
+      etika_bahasa: parseScore(row.etika_bahasa),
+      keterampilan_menulis: parseScore(row.keterampilan_menulis),
+      keterampilan_analisis: parseScore(row.keterampilan_analisis),
+      prosedur_informasi: parseScore(row.prosedur_informasi),
+      prosedur_proses: parseScore(row.prosedur_proses),
+      prosedur_tiket: parseScore(row.prosedur_tiket),
     });
     setErrorMessage('');
     setShowModal(true);
@@ -881,39 +918,46 @@ export function TemuanSamplingTable({ data, isQA, petugasList }: TemuanSamplingT
 
 // Indicator detail row
 function IndicatorRow({ label, score }: { label: string; score: any }) {
-  const num = Number(score) ?? 100;
+  const valStr = score !== undefined && score !== null ? String(score).trim().toUpperCase() : 'N/A';
+  
+  // Define colors based on the value
+  let badgeColor = 'bg-slate-100 text-slate-700 border-slate-200';
+  if (valStr === '3' || valStr === 'N/A') {
+    badgeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  } else if (valStr === '2') {
+    badgeColor = 'bg-blue-50 text-blue-700 border-blue-200';
+  } else if (valStr === '1') {
+    badgeColor = 'bg-amber-50 text-amber-700 border-amber-200';
+  } else if (valStr === '0') {
+    badgeColor = 'bg-red-50 text-red-700 border-red-200';
+  }
+
   return (
-    <div className="flex items-center justify-between text-xs py-1">
+    <div className="flex items-center justify-between text-xs py-1.5 border-b border-slate-50 last:border-0">
       <span className="text-slate-600 font-medium">{label}</span>
-      <div className="flex items-center gap-2">
-        <div className="w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
-          <div 
-            className={`h-full rounded-full ${num >= 90 ? 'bg-emerald-500' : num >= 75 ? 'bg-amber-500' : 'bg-red-500'}`}
-            style={{ width: `${num}%` }}
-          />
-        </div>
-        <span className={`font-bold tabular-nums w-8 text-right ${num >= 90 ? 'text-emerald-700' : num >= 75 ? 'text-amber-700' : 'text-red-700'}`}>
-          {num}%
-        </span>
-      </div>
+      <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${badgeColor}`}>
+        {valStr === 'N/A' ? 'N/A' : `${valStr} / 3`}
+      </span>
     </div>
   );
 }
 
-// Custom input helper
-function ScoreInput({ label, name, val, set }: { label: string; name: string; val: number; set: any }) {
+// Custom input helper for score selection (0, 1, 2, 3, N/A)
+function ScoreInput({ label, name, val, set }: { label: string; name: string; val: string; set: any }) {
   return (
     <div className="space-y-1">
       <label className="text-[10px] font-bold text-slate-500">{label}</label>
-      <input
-        type="number"
-        min="0"
-        max="100"
-        required
+      <select
         value={val}
-        onChange={(e) => set((prev: any) => ({ ...prev, [name]: Number(e.target.value) }))}
+        onChange={(e) => set((prev: any) => ({ ...prev, [name]: e.target.value }))}
         className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-slate-800 text-center font-bold"
-      />
+      >
+        <option value="3">3</option>
+        <option value="2">2</option>
+        <option value="1">1</option>
+        <option value="0">0</option>
+        <option value="N/A">N/A</option>
+      </select>
     </div>
   );
 }

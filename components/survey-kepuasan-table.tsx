@@ -16,7 +16,7 @@ import {
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { fetchSheetCsv } from '@/lib/googleSheetHelper';
-import { saveSurveyKepuasanAction, deleteSurveyKepuasanAction, importSurveyKepuasanAction } from '@/app/actions/checklists';
+import { saveSurveyKepuasanAction, deleteSurveyKepuasanAction, deleteSurveyKepuasansAction, importSurveyKepuasanAction } from '@/app/actions/checklists';
 
 interface SurveyKepuasanTableProps {
   data: any[];
@@ -28,6 +28,7 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
   const [isPending, startTransition] = useTransition();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
   // Import State & Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -179,6 +180,47 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
     const matchesYear = row.year ? String(row.year) === selectedYear : true;
     return matchesSearch && matchesYear;
   });
+
+  const visibleRowIndices = filteredData.map(row => Number(row.__rowIndex));
+  const isAllSelected = filteredData.length > 0 && filteredData.every(row => selectedRows.includes(Number(row.__rowIndex)));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRows(prev => prev.filter(id => !visibleRowIndices.includes(id)));
+    } else {
+      setSelectedRows(prev => {
+        const newSelections = [...prev];
+        visibleRowIndices.forEach(id => {
+          if (!newSelections.includes(id)) {
+            newSelections.push(id);
+          }
+        });
+        return newSelections;
+      });
+    }
+  };
+
+  const handleSelectRow = (rowIndex: number) => {
+    setSelectedRows(prev => 
+      prev.includes(rowIndex) 
+        ? prev.filter(id => id !== rowIndex) 
+        : [...prev, rowIndex]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedRows.length} data checklist survey terpilih?`)) {
+      startTransition(async () => {
+        const res = await deleteSurveyKepuasansAction(selectedRows);
+        if (res.success) {
+          setSelectedRows([]);
+          toast.success(res.message);
+        } else {
+          toast.error(res.error);
+        }
+      });
+    }
+  };
 
   // Toggle Checkbox Cell
   const handleToggle = (row: any, month: string) => {
@@ -332,6 +374,17 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                 <Upload className="w-3.5 h-3.5" />
                 Import Spreadsheet
               </button>
+              {selectedRows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBatchDelete}
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md transition-all disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus Terpilih ({selectedRows.length})
+                </button>
+              )}
               <button
                 onClick={() => {
                   setFormPetugasName(petugasList[0] || '');
@@ -354,6 +407,16 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                {isQA && (
+                  <th className="px-4 py-4 text-center w-12">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSelected} 
+                      onChange={handleSelectAll}
+                      className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4">Nama Petugas</th>
                 {monthLabels.map(m => (
                   <th key={m} className="px-3 py-4 text-center">{m}</th>
@@ -365,6 +428,16 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
               {filteredData.length > 0 ? (
                 filteredData.map((row) => (
                   <tr key={row.__rowIndex} className="hover:bg-slate-50/50 transition-colors">
+                    {isQA && (
+                      <td className="px-4 py-4 text-center w-12">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedRows.includes(Number(row.__rowIndex))}
+                          onChange={() => handleSelectRow(Number(row.__rowIndex))}
+                          className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 font-bold text-slate-800">{row.petugas_name}</td>
                     {months.map(m => {
                       const isChecked = row[m] === 'TRUE' || row[m] === true;
@@ -406,7 +479,7 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                 ))
               ) : (
                 <tr>
-                  <td colSpan={14} className="text-center py-10 text-slate-400">
+                  <td colSpan={isQA ? 15 : 14} className="text-center py-10 text-slate-400">
                     Tidak ada data checklist survey kepuasan untuk tahun {selectedYear}
                   </td>
                 </tr>
@@ -415,13 +488,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
           </table>
         </div>
       </div>
-
-      {isQA && (
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-start gap-2.5 text-xs text-slate-500 font-semibold">
-          <AlertCircle className="w-4.5 h-4.5 text-[#BE185D] shrink-0" />
-          <span>Sebagai QA, Anda dapat melakukan checklist langsung pada tabel dengan mengeklik ikon kotak di atas.</span>
-        </div>
-      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">

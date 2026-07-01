@@ -14,7 +14,7 @@ import {
   RefreshCw 
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { saveNilaiKualitasAction, deleteNilaiKualitasAction, importNilaiKualitasAction } from '@/app/actions/nilai-kualitas';
+import { saveNilaiKualitasAction, deleteNilaiKualitasAction, deleteNilaiKualitasesAction, importNilaiKualitasAction } from '@/app/actions/nilai-kualitas';
 import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 
 interface NilaiKualitasTableProps {
@@ -30,6 +30,7 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
   const [sortAsc, setSortAsc] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
   // Import State & Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -234,6 +235,47 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
     currentPage * itemsPerPage
   );
 
+  const visibleRowIndices = paginatedData.map(row => Number(row.__rowIndex));
+  const isAllSelected = paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(Number(row.__rowIndex)));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRows(prev => prev.filter(id => !visibleRowIndices.includes(id)));
+    } else {
+      setSelectedRows(prev => {
+        const newSelections = [...prev];
+        visibleRowIndices.forEach(id => {
+          if (!newSelections.includes(id)) {
+            newSelections.push(id);
+          }
+        });
+        return newSelections;
+      });
+    }
+  };
+
+  const handleSelectRow = (rowIndex: number) => {
+    setSelectedRows(prev => 
+      prev.includes(rowIndex) 
+        ? prev.filter(id => id !== rowIndex) 
+        : [...prev, rowIndex]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedRows.length} data nilai kualitas terpilih?`)) {
+      startTransition(async () => {
+        const res = await deleteNilaiKualitasesAction(selectedRows);
+        if (res.success) {
+          setSelectedRows([]);
+          alert(res.message);
+        } else {
+          alert(res.error);
+        }
+      });
+    }
+  };
+
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortAsc(!sortAsc);
@@ -397,6 +439,17 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
                 <Upload className="w-3.5 h-3.5" />
                 Import Spreadsheet
               </button>
+              {selectedRows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBatchDelete}
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md transition-all disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus Terpilih ({selectedRows.length})
+                </button>
+              )}
               <button
                 onClick={openAddModal}
                 className="flex items-center gap-1.5 px-3 py-2 bg-[#BE185D] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
@@ -415,6 +468,16 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                {isQA && (
+                  <th className="px-4 py-4 text-center w-12">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSelected} 
+                      onChange={handleSelectAll}
+                      className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th 
                   className="px-6 py-4 cursor-pointer hover:bg-slate-100/80 transition-colors"
                   onClick={() => handleSort('petugas_name')}
@@ -445,6 +508,16 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
                   const avg = getAverage(row);
                   return (
                     <tr key={row.__rowIndex} className="hover:bg-slate-50/50 transition-colors">
+                      {isQA && (
+                        <td className="px-4 py-4 text-center w-12">
+                          <input 
+                            type="checkbox" 
+                            checked={selectedRows.includes(Number(row.__rowIndex))}
+                            onChange={() => handleSelectRow(Number(row.__rowIndex))}
+                            className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                          />
+                        </td>
+                      )}
                       <td className="px-6 py-4 font-bold text-slate-800">{row.petugas_name}</td>
                       {months.map(m => (
                         <td key={m} className="px-3 py-4 text-center tabular-nums">
@@ -497,7 +570,7 @@ export function NilaiKualitasTable({ data, isQA }: NilaiKualitasTableProps) {
                 })
               ) : (
                 <tr>
-                  <td colSpan={15} className="text-center py-10 text-slate-400">
+                  <td colSpan={isQA ? 16 : 15} className="text-center py-10 text-slate-400">
                     Tidak ada data petugas untuk tahun {selectedYear}
                   </td>
                 </tr>

@@ -15,7 +15,7 @@ import {
   Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { saveTemuanEksternalAction, deleteTemuanEksternalAction, importTemuanEksternalAction } from '@/app/actions/temuan';
+import { saveTemuanEksternalAction, deleteTemuanEksternalAction, deleteTemuanEksternalsAction, importTemuanEksternalAction } from '@/app/actions/temuan';
 import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 
 interface TemuanEksternalTableProps {
@@ -34,6 +34,7 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
   const [sheetUrl, setSheetUrl] = useState('');
   const [showSheetModal, setShowSheetModal] = useState(false);
   const itemsPerPage = 8;
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
   // Import State & Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -220,6 +221,47 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  const visibleRowIndices = paginatedData.map(row => Number(row.__rowIndex));
+  const isAllSelected = paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(Number(row.__rowIndex)));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRows(prev => prev.filter(id => !visibleRowIndices.includes(id)));
+    } else {
+      setSelectedRows(prev => {
+        const newSelections = [...prev];
+        visibleRowIndices.forEach(id => {
+          if (!newSelections.includes(id)) {
+            newSelections.push(id);
+          }
+        });
+        return newSelections;
+      });
+    }
+  };
+
+  const handleSelectRow = (rowIndex: number) => {
+    setSelectedRows(prev => 
+      prev.includes(rowIndex) 
+        ? prev.filter(id => id !== rowIndex) 
+        : [...prev, rowIndex]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedRows.length} data temuan eksternal terpilih?`)) {
+      startTransition(async () => {
+        const res = await deleteTemuanEksternalsAction(selectedRows);
+        if (res.success) {
+          setSelectedRows([]);
+          alert(res.message);
+        } else {
+          alert(res.error);
+        }
+      });
+    }
+  };
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -414,6 +456,17 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
                 <Upload className="w-3.5 h-3.5" />
                 Import Spreadsheet
               </button>
+              {selectedRows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBatchDelete}
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md transition-all disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus Terpilih ({selectedRows.length})
+                </button>
+              )}
               <button
                 onClick={openAddModal}
                 className="flex items-center gap-1.5 px-3 py-2 bg-[#BE185D] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
@@ -432,6 +485,16 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                {isQA && (
+                  <th className="px-4 py-4 text-center w-12">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSelected} 
+                      onChange={handleSelectAll}
+                      className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleSort('kode_tiket')}>
                   Kode Tiket {sortField === 'kode_tiket' && (sortAsc ? '▲' : '▼')}
                 </th>
@@ -452,6 +515,16 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
               {paginatedData.length > 0 ? (
                 paginatedData.map((row) => (
                   <tr key={row.__rowIndex} className="hover:bg-slate-50/50 transition-colors">
+                    {isQA && (
+                      <td className="px-4 py-4 text-center w-12">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedRows.includes(Number(row.__rowIndex))}
+                          onChange={() => handleSelectRow(Number(row.__rowIndex))}
+                          className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 font-bold text-slate-850 text-blue-700">{row.kode_tiket}</td>
                     <td className="px-4 py-4 font-bold text-slate-800">{row.petugas_name}</td>
                     <td className="px-4 py-4 text-slate-500">{row.tanggal_temuan}</td>
@@ -492,7 +565,7 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="text-center py-10 text-slate-400">
+                  <td colSpan={isQA ? 7 : 6} className="text-center py-10 text-slate-400">
                     Tidak ada data temuan eksternal
                   </td>
                 </tr>

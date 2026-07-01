@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { Topbar } from '@/components/topbar';
 import { SurveyKepuasanTable } from '@/components/survey-kepuasan-table';

@@ -15,7 +15,7 @@ import {
   Eye
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { saveCoachingAction, deleteCoachingAction, importCoachingAction } from '@/app/actions/coaching';
+import { saveCoachingAction, deleteCoachingAction, deleteCoachingsAction, importCoachingAction } from '@/app/actions/coaching';
 import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 
 interface CoachingTableProps {
@@ -32,6 +32,7 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
   const [sortAsc, setSortAsc] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
   // Import State & Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -213,6 +214,47 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
     currentPage * itemsPerPage
   );
 
+  const visibleRowIndices = paginatedData.map(row => Number(row.__rowIndex));
+  const isAllSelected = paginatedData.length > 0 && paginatedData.every(row => selectedRows.includes(Number(row.__rowIndex)));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRows(prev => prev.filter(id => !visibleRowIndices.includes(id)));
+    } else {
+      setSelectedRows(prev => {
+        const newSelections = [...prev];
+        visibleRowIndices.forEach(id => {
+          if (!newSelections.includes(id)) {
+            newSelections.push(id);
+          }
+        });
+        return newSelections;
+      });
+    }
+  };
+
+  const handleSelectRow = (rowIndex: number) => {
+    setSelectedRows(prev => 
+      prev.includes(rowIndex) 
+        ? prev.filter(id => id !== rowIndex) 
+        : [...prev, rowIndex]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedRows.length} data riwayat coaching yang terpilih?`)) {
+      startTransition(async () => {
+        const res = await deleteCoachingsAction(selectedRows);
+        if (res.success) {
+          setSelectedRows([]);
+          alert(res.message);
+        } else {
+          alert(res.error);
+        }
+      });
+    }
+  };
+
   const handleSort = (field: string) => {
     if (sortField === field) {
       setSortAsc(!sortAsc);
@@ -383,6 +425,17 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
                 <Upload className="w-3.5 h-3.5" />
                 Import Spreadsheet
               </button>
+              {selectedRows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBatchDelete}
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md transition-all disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus Terpilih ({selectedRows.length})
+                </button>
+              )}
               <button
                 type="button"
                 onClick={openAddModal}
@@ -402,6 +455,16 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                {isQA && (
+                  <th className="px-4 py-4 text-center w-12">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSelected} 
+                      onChange={handleSelectAll}
+                      className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4 cursor-pointer hover:bg-slate-100/80 transition-colors" onClick={() => handleSort('petugas_name')}>
                   Nama Petugas {sortField === 'petugas_name' && (sortAsc ? '▲' : '▼')}
                 </th>
@@ -419,6 +482,16 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
               {paginatedData.length > 0 ? (
                 paginatedData.map((row) => (
                   <tr key={row.__rowIndex} className="hover:bg-slate-50/50 transition-colors">
+                    {isQA && (
+                      <td className="px-4 py-4 text-center w-12">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedRows.includes(Number(row.__rowIndex))}
+                          onChange={() => handleSelectRow(Number(row.__rowIndex))}
+                          className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 font-bold text-slate-800">{row.petugas_name}</td>
                     <td className="px-4 py-4">
                       <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100 font-bold text-[10px]">
@@ -458,7 +531,7 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-slate-400">
+                  <td colSpan={isQA ? 6 : 5} className="text-center py-10 text-slate-400">
                     Tidak ada data riwayat coaching
                   </td>
                 </tr>

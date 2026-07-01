@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
-import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow, deleteSheetRows } from '@/lib/google-sheets';
 
 export async function saveCoachingAction(rowData: Record<string, any>) {
   const user = await getCurrentUser();
@@ -44,6 +44,21 @@ export async function deleteCoachingAction(rowIndex: number) {
   if (success) {
     revalidatePath('/coaching');
     return { success: true, message: 'Data riwayat coaching berhasil dihapus.' };
+  } else {
+    return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
+  }
+}
+
+export async function deleteCoachingsAction(rowIndices: number[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  const success = await deleteSheetRows('coaching', rowIndices);
+  if (success) {
+    revalidatePath('/coaching');
+    return { success: true, message: `Berhasil menghapus ${rowIndices.length} data riwayat coaching.` };
   } else {
     return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
   }

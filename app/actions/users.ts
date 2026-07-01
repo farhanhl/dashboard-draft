@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser, hashPassword } from '@/lib/auth';
-import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow, readSheetRows } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow, deleteSheetRows, readSheetRows } from '@/lib/google-sheets';
 
 // 1. Add or Update User
 export async function saveUserAction(rowData: Record<string, any>) {
@@ -120,6 +120,27 @@ export async function deleteUserAction(rowIndex: number, userIdToDelete: string)
   if (success) {
     revalidatePath('/users');
     return { success: true, message: 'Pengguna berhasil dihapus.' };
+  } else {
+    return { success: false, error: 'Gagal menghapus pengguna dari Google Sheets.' };
+  }
+}
+
+// 3b. Batch Delete Users Action
+export async function deleteUsersAction(rowIndices: number[], userIds: string[]) {
+  const admin = await getCurrentUser();
+  if (!admin || admin.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak.' };
+  }
+
+  // Prevent deleting oneself
+  if (userIds.includes(admin.id)) {
+    return { success: false, error: 'Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif dalam seleksi massal.' };
+  }
+
+  const success = await deleteSheetRows('users', rowIndices);
+  if (success) {
+    revalidatePath('/users');
+    return { success: true, message: `Berhasil menghapus ${rowIndices.length} pengguna.` };
   } else {
     return { success: false, error: 'Gagal menghapus pengguna dari Google Sheets.' };
   }

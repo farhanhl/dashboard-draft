@@ -23,7 +23,7 @@ export function verifyPassword(password: string, storedHash: string): boolean {
     if (!salt || !hash) return false;
     const verifyHash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex');
     return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(verifyHash, 'hex'));
-  } catch (error) {
+  } catch {
     return false;
   }
 }
@@ -120,7 +120,7 @@ export async function getCurrentUser(): Promise<{ id: string; email: string; nam
       name: session.name,
       role: session.role,
     };
-  } catch (error) {
+  } catch {
     return null;
   }
 }

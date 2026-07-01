@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
-import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow, deleteSheetRows } from '@/lib/google-sheets';
 
 // 1. Save or Update Scores
 export async function saveNilaiKualitasAction(rowData: Record<string, any>) {
@@ -42,6 +42,22 @@ export async function deleteNilaiKualitasAction(rowIndex: number) {
   if (success) {
     revalidatePath('/nilai-kualitas');
     return { success: true, message: 'Data nilai kualitas berhasil dihapus.' };
+  } else {
+    return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
+  }
+}
+
+// 2b. Batch Delete Petugas rows
+export async function deleteNilaiKualitasesAction(rowIndices: number[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  const success = await deleteSheetRows('nilaiKualitas', rowIndices);
+  if (success) {
+    revalidatePath('/nilai-kualitas');
+    return { success: true, message: `Berhasil menghapus ${rowIndices.length} data nilai kualitas.` };
   } else {
     return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
   }

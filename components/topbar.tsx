@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Database, RefreshCw } from 'lucide-react';
+import { Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TopbarProps {

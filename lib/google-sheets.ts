@@ -676,6 +676,64 @@ export async function deleteSheetRow(
   }
 }
 
+// 8b. Delete multiple existing rows
+export async function deleteSheetRows(
+  sheetNameKey: keyof typeof DEFAULT_SHEET_NAMES,
+  rowIndices: number[]
+): Promise<boolean> {
+  const config = await getGoogleConfig();
+  if (!config || !rowIndices || rowIndices.length === 0) return false;
+
+  const validIndices = rowIndices.filter(idx => idx >= 2);
+  if (validIndices.length === 0) return false;
+
+  // Sort indices in descending order to prevent shifting issues during deletion
+  validIndices.sort((a, b) => b - a);
+
+  const actualSheetName = config.sheetNames?.[sheetNameKey] || DEFAULT_SHEET_NAMES[sheetNameKey];
+
+  try {
+    const sheets = await getSheetsClient(config);
+
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: config.spreadsheetId,
+    });
+
+    const sheet = spreadsheet.data.sheets?.find(
+      s => s.properties?.title === actualSheetName
+    );
+
+    if (!sheet || sheet.properties?.sheetId === undefined) {
+      throw new Error(`Sheet ${actualSheetName} tidak ditemukan.`);
+    }
+
+    const sheetId = sheet.properties.sheetId;
+
+    const requests = validIndices.map(rowIndex => ({
+      deleteDimension: {
+        range: {
+          sheetId,
+          dimension: 'ROWS',
+          startIndex: rowIndex - 1,
+          endIndex: rowIndex,
+        },
+      },
+    }));
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: config.spreadsheetId,
+      requestBody: {
+        requests,
+      },
+    });
+
+    return true;
+  } catch (error) {
+    console.error(`Error deleting rows ${rowIndices.join(', ')} in sheet "${actualSheetName}":`, error);
+    return false;
+  }
+}
+
 // 9. Initialize Spreadsheet: Create sheets and write default headers
 export async function initializeSpreadsheet(config: GoogleConfig): Promise<{ success: boolean; message: string }> {
   try {

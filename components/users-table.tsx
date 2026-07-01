@@ -13,7 +13,7 @@ import {
   Upload
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { saveUserAction, deleteUserAction, resetPasswordAction, importUsersAction } from '@/app/actions/users';
+import { saveUserAction, deleteUserAction, deleteUsersAction, resetPasswordAction, importUsersAction } from '@/app/actions/users';
 import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 
 interface UsersTableProps {
@@ -24,6 +24,7 @@ interface UsersTableProps {
 export function UsersTable({ data, currentUser }: UsersTableProps) {
   const [isPending, startTransition] = useTransition();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
   
   // Import State & Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,6 +174,65 @@ export function UsersTable({ data, currentUser }: UsersTableProps) {
     );
   });
 
+  const visibleRowIndices = filteredData.map(row => Number(row.__rowIndex));
+  const deletableRowIndices = filteredData
+    .filter(row => row.id !== currentUser.id)
+    .map(row => Number(row.__rowIndex));
+
+  const isAllSelected = deletableRowIndices.length > 0 && deletableRowIndices.every(row => selectedRows.includes(row));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRows(prev => prev.filter(id => !deletableRowIndices.includes(id)));
+    } else {
+      setSelectedRows(prev => {
+        const newSelections = [...prev];
+        deletableRowIndices.forEach(id => {
+          if (!newSelections.includes(id)) {
+            newSelections.push(id);
+          }
+        });
+        return newSelections;
+      });
+    }
+  };
+
+  const handleSelectRow = (rowIndex: number) => {
+    setSelectedRows(prev => 
+      prev.includes(rowIndex) 
+        ? prev.filter(id => id !== rowIndex) 
+        : [...prev, rowIndex]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    const currentUserRow = filteredData.find(row => row.id === currentUser.id);
+    const currentUserRowIndex = currentUserRow ? Number(currentUserRow.__rowIndex) : null;
+    const finalSelectedRows = selectedRows.filter(id => id !== currentUserRowIndex);
+
+    if (finalSelectedRows.length === 0) {
+      alert('Tidak ada pengguna lain yang terpilih untuk dihapus.');
+      return;
+    }
+
+    const userIds = finalSelectedRows.map(rowIndex => {
+      const row = filteredData.find(r => Number(r.__rowIndex) === rowIndex);
+      return row ? row.id : '';
+    }).filter(Boolean);
+
+    if (confirm(`Apakah Anda yakin ingin menghapus ${finalSelectedRows.length} pengguna terpilih?`)) {
+      startTransition(async () => {
+        const res = await deleteUsersAction(finalSelectedRows, userIds);
+        if (res.success) {
+          setSelectedRows([]);
+          alert(res.message);
+        } else {
+          alert(res.error);
+        }
+      });
+    }
+  };
+
   // Open Add Modal
   const openAddModal = () => {
     setCurrentEditRow(null);
@@ -318,6 +378,17 @@ export function UsersTable({ data, currentUser }: UsersTableProps) {
             <Upload className="w-3.5 h-3.5" />
             Import Spreadsheet
           </button>
+          {selectedRows.length > 0 && (
+            <button
+              type="button"
+              onClick={handleBatchDelete}
+              disabled={isPending}
+              className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md transition-all disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Hapus Terpilih ({selectedRows.length})
+            </button>
+          )}
           <button
             onClick={openAddModal}
             className="flex items-center gap-1.5 px-3 py-2 bg-[#BE185D] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all shrink-0"
@@ -334,6 +405,15 @@ export function UsersTable({ data, currentUser }: UsersTableProps) {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                <th className="px-4 py-4 text-center w-12">
+                  <input 
+                    type="checkbox" 
+                    checked={isAllSelected} 
+                    onChange={handleSelectAll}
+                    disabled={deletableRowIndices.length === 0}
+                    className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
+                  />
+                </th>
                 <th className="px-6 py-4">Nama Pengguna</th>
                 <th className="px-4 py-4">Email</th>
                 <th className="px-4 py-4 text-center">Role</th>
@@ -345,6 +425,15 @@ export function UsersTable({ data, currentUser }: UsersTableProps) {
               {filteredData.length > 0 ? (
                 filteredData.map((row) => (
                   <tr key={row.__rowIndex} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-4 text-center w-12">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedRows.includes(Number(row.__rowIndex))}
+                        onChange={() => handleSelectRow(Number(row.__rowIndex))}
+                        disabled={currentUser.id === row.id}
+                        className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer disabled:opacity-50"
+                      />
+                    </td>
                     <td className="px-6 py-4 font-bold text-slate-850 flex items-center gap-2">
                       {row.name}
                       {currentUser.id === row.id && (
@@ -393,7 +482,7 @@ export function UsersTable({ data, currentUser }: UsersTableProps) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-slate-400">
+                  <td colSpan={6} className="text-center py-10 text-slate-400">
                     Tidak ada data pengguna
                   </td>
                 </tr>

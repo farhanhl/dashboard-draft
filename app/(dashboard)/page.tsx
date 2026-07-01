@@ -4,8 +4,6 @@ import {
   Percent, 
   ClipboardList, 
   AlertTriangle, 
-  TrendingUp, 
-  FileSpreadsheet, 
   ChevronRight,
   Database
 } from 'lucide-react';

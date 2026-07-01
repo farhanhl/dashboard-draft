@@ -3,7 +3,7 @@
 import crypto from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/lib/auth';
-import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow } from '@/lib/google-sheets';
+import { appendSheetRow, appendSheetRows, updateSheetRow, deleteSheetRow, deleteSheetRows } from '@/lib/google-sheets';
 
 // --- TEMUAN SAMPLING ACTIONS ---
 
@@ -55,6 +55,22 @@ export async function deleteTemuanSamplingAction(rowIndex: number) {
   }
 }
 
+export async function deleteTemuanSamplingsAction(rowIndices: number[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  const success = await deleteSheetRows('temuanSampling', rowIndices);
+  if (success) {
+    revalidatePath('/temuan-sampling');
+    revalidatePath('/');
+    return { success: true, message: `Berhasil menghapus ${rowIndices.length} data temuan sampling.` };
+  } else {
+    return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
+  }
+}
+
 
 // --- TEMUAN EKSTERNAL ACTIONS ---
 
@@ -101,6 +117,22 @@ export async function deleteTemuanEksternalAction(rowIndex: number) {
     revalidatePath('/temuan-eksternal');
     revalidatePath('/');
     return { success: true, message: 'Data temuan eksternal berhasil dihapus.' };
+  } else {
+    return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
+  }
+}
+
+export async function deleteTemuanEksternalsAction(rowIndices: number[]) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak. Anda bukan administrator.' };
+  }
+
+  const success = await deleteSheetRows('temuanEksternal', rowIndices);
+  if (success) {
+    revalidatePath('/temuan-eksternal');
+    revalidatePath('/');
+    return { success: true, message: `Berhasil menghapus ${rowIndices.length} data temuan eksternal.` };
   } else {
     return { success: false, error: 'Gagal menghapus data di Google Sheets.' };
   }

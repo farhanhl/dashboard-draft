@@ -14,7 +14,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { saveTicketSamplingAction, deleteTicketSamplingAction, importTicketSamplingAction } from '@/app/actions/checklists';
+import { saveTicketSamplingAction, deleteTicketSamplingAction, deleteTicketSamplingsAction, importTicketSamplingAction } from '@/app/actions/checklists';
 import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 
 interface TicketSamplingTableProps {
@@ -28,6 +28,7 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
 
   // Import State & Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -54,12 +55,9 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
         k.toLowerCase() === 'kategori' || 
         k.toLowerCase() === 'category'
       );
-      let rawCat = catKey ? String(row[catKey]).trim() : 'Chat';
-      if (rawCat) {
-        rawCat = rawCat.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-      }
+      let rawCat = catKey ? String(row[catKey]).trim().toUpperCase() : 'PTNP';
       if (!categories.includes(rawCat)) {
-        rawCat = 'Chat';
+        rawCat = 'PTNP';
       }
       mapped.category = rawCat;
 
@@ -175,7 +173,7 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [formPetugasName, setFormPetugasName] = useState('');
-  const [formCategory, setFormCategory] = useState('Chat');
+  const [formCategory, setFormCategory] = useState('PTNP');
   const [formYear, setFormYear] = useState(new Date().getFullYear().toString());
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -184,7 +182,11 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
   const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
   const monthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
-  const categories = ['Chat', 'Email', 'Call', 'Social Media', 'Walk-in'];
+  const categories = [
+    'PTNP', 'PBPU', 'ATNP', 'APBI', 'APPU', 'ABPU', 'MBPU', 'MTBU', 
+    'PNAK', 'PNGL', 'PNPBL', 'PNWL', 'PNDG', 'PPHK', 'PRID', 'PRHP', 
+    'PRGL', 'UFTP', 'UTPL', 'UTPK', 'NMNG', 'UBKK', 'NKLN', 'UKLS', 'UPVA'
+  ];
 
   const availableYears = Array.from(new Set(data.map(item => item.year).filter(Boolean)))
     .map(String)
@@ -201,6 +203,47 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
     const matchesCategory = selectedCategory === 'ALL' ? true : String(row.category).toLowerCase() === selectedCategory.toLowerCase();
     return matchesSearch && matchesYear && matchesCategory;
   });
+
+  const visibleRowIndices = filteredData.map(row => Number(row.__rowIndex));
+  const isAllSelected = filteredData.length > 0 && filteredData.every(row => selectedRows.includes(Number(row.__rowIndex)));
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedRows(prev => prev.filter(id => !visibleRowIndices.includes(id)));
+    } else {
+      setSelectedRows(prev => {
+        const newSelections = [...prev];
+        visibleRowIndices.forEach(id => {
+          if (!newSelections.includes(id)) {
+            newSelections.push(id);
+          }
+        });
+        return newSelections;
+      });
+    }
+  };
+
+  const handleSelectRow = (rowIndex: number) => {
+    setSelectedRows(prev => 
+      prev.includes(rowIndex) 
+        ? prev.filter(id => id !== rowIndex) 
+        : [...prev, rowIndex]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    if (confirm(`Apakah Anda yakin ingin menghapus ${selectedRows.length} data checklist ticket terpilih?`)) {
+      startTransition(async () => {
+        const res = await deleteTicketSamplingsAction(selectedRows);
+        if (res.success) {
+          setSelectedRows([]);
+          alert(res.message);
+        } else {
+          alert(res.error);
+        }
+      });
+    }
+  };
 
   // Toggle Checkbox Cell
   const handleToggle = (row: any, month: string) => {
@@ -239,7 +282,7 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
     const exists = data.some(
       row => row.petugas_name?.toLowerCase() === formPetugasName.toLowerCase() && 
              String(row.year) === formYear &&
-             String(row.category).toLowerCase() === formCategory.toLowerCase()
+             String(row.category).toUpperCase() === formCategory.toUpperCase()
     );
     if (exists) {
       setErrorMessage(`Petugas sudah memiliki baris checklist untuk kategori "${formCategory}" tahun ${formYear}.`);
@@ -371,10 +414,21 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
                 <Upload className="w-3.5 h-3.5" />
                 Import Spreadsheet
               </button>
+              {selectedRows.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBatchDelete}
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold shadow-md transition-all disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Hapus Terpilih ({selectedRows.length})
+                </button>
+              )}
               <button
                 onClick={() => {
                   setFormPetugasName(petugasList[0] || '');
-                  setFormCategory('Chat');
+                  setFormCategory('PTNP');
                   setFormYear(selectedYear);
                   setErrorMessage('');
                   setShowModal(true);
@@ -395,6 +449,16 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                {isQA && (
+                  <th className="px-4 py-4 text-center w-12">
+                    <input 
+                      type="checkbox" 
+                      checked={isAllSelected} 
+                      onChange={handleSelectAll}
+                      className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-4">Nama Petugas</th>
                 <th className="px-4 py-4">Kategori</th>
                 {monthLabels.map(m => (
@@ -407,10 +471,20 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
               {filteredData.length > 0 ? (
                 filteredData.map((row) => (
                   <tr key={row.__rowIndex} className="hover:bg-slate-50/50 transition-colors">
+                    {isQA && (
+                      <td className="px-4 py-4 text-center w-12">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedRows.includes(Number(row.__rowIndex))}
+                          onChange={() => handleSelectRow(Number(row.__rowIndex))}
+                          className="rounded border-slate-300 text-[#BE185D] focus:ring-[#BE185D] w-3.5 h-3.5 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 font-bold text-slate-800">{row.petugas_name}</td>
                     <td className="px-4 py-4">
                       <span className="inline-block px-2 py-0.5 rounded-md bg-blue-50 text-[#BE185D] font-bold text-[10px] border border-blue-100">
-                        {row.category || 'Chat'}
+                        {row.category || 'PTNP'}
                       </span>
                     </td>
                     {months.map(m => {
@@ -453,7 +527,7 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
                 ))
               ) : (
                 <tr>
-                  <td colSpan={15} className="text-center py-10 text-slate-400">
+                  <td colSpan={isQA ? 16 : 15} className="text-center py-10 text-slate-400">
                     Tidak ada data checklist ticket sampling untuk tahun {selectedYear}
                   </td>
                 </tr>
@@ -462,13 +536,6 @@ export function TicketSamplingTable({ data, isQA, petugasList }: TicketSamplingT
           </table>
         </div>
       </div>
-
-      {isQA && (
-        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-start gap-2.5 text-xs text-slate-500 font-semibold">
-          <AlertCircle className="w-4.5 h-4.5 text-[#BE185D] shrink-0" />
-          <span>Sebagai QA, Anda dapat melakukan checklist langsung pada tabel dengan mengeklik ikon kotak di atas.</span>
-        </div>
-      )}
 
       {/* Add Checklist Modal */}
       {showModal && (

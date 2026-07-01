@@ -1,10 +1,9 @@
-import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { Topbar } from '@/components/topbar';
 import { NilaiKualitasTable } from '@/components/nilai-kualitas-table';
 import { getGoogleConfig, readSheetRows, testGoogleConnection } from '@/lib/google-sheets';
 
-export const revalidate = 0; // Read directly from google sheet in real time
+export const revalidate = 0;
 
 export default async function NilaiKualitasPage() {
   const config = await getGoogleConfig();

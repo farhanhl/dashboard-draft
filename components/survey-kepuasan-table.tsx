@@ -14,6 +14,8 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
+import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 import { saveSurveyKepuasanAction, deleteSurveyKepuasanAction, importSurveyKepuasanAction } from '@/app/actions/checklists';
 
 interface SurveyKepuasanTableProps {
@@ -30,8 +32,59 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
   // Import State & Ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+
   const handleImportClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const processImportRows = (json: any[]): any[] => {
+    return json.map(row => {
+      const mapped: any = {};
+      
+      const petugasKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'nama petugas' || 
+        k.toLowerCase() === 'petugas_name' || 
+        k.toLowerCase() === 'nama' ||
+        k.toLowerCase() === 'petugas'
+      );
+      mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
+
+      const yearKey = Object.keys(row).find(k => 
+        k.toLowerCase() === 'tahun' || 
+        k.toLowerCase() === 'year'
+      );
+      mapped.year = yearKey ? String(row[yearKey]).trim() : new Date().getFullYear().toString();
+
+      const monthMapping: Record<string, string[]> = {
+        jan: ['jan', 'januari', 'january'],
+        feb: ['feb', 'februari', 'february'],
+        mar: ['mar', 'maret', 'march'],
+        apr: ['apr', 'april'],
+        may: ['mei', 'may'],
+        jun: ['jun', 'juni', 'june'],
+        jul: ['jul', 'juli', 'july'],
+        aug: ['agu', 'agustus', 'august', 'aug'],
+        sep: ['sep', 'september'],
+        oct: ['okt', 'oktober', 'october', 'oct'],
+        nov: ['nov', 'november'],
+        dec: ['des', 'desember', 'december', 'dec']
+      };
+
+      Object.entries(monthMapping).forEach(([dbField, aliases]) => {
+        const rowKey = Object.keys(row).find(k => 
+          aliases.includes(k.toLowerCase())
+        );
+        if (rowKey !== undefined) {
+          const valStr = String(row[rowKey]).trim().toLowerCase();
+          const isTrue = valStr === 'true' || valStr === '1' || valStr === 'yes' || valStr === 'ya' || valStr === 'y' || valStr === 'v' || valStr === 'x';
+          mapped[dbField] = isTrue ? 'TRUE' : 'FALSE';
+        } else {
+          mapped[dbField] = 'FALSE';
+        }
+      });
+
+      return mapped;
+    }).filter(r => r.petugas_name);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,86 +101,63 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
 
         if (json.length === 0) {
-          alert('Spreadsheet kosong.');
+          toast.error('Spreadsheet kosong.');
           return;
         }
 
-        const mappedRows = json.map(row => {
-          const mapped: any = {};
-          
-          const petugasKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'nama petugas' || 
-            k.toLowerCase() === 'petugas_name' || 
-            k.toLowerCase() === 'nama' ||
-            k.toLowerCase() === 'petugas'
-          );
-          mapped.petugas_name = petugasKey ? String(row[petugasKey]).trim() : '';
-
-          const yearKey = Object.keys(row).find(k => 
-            k.toLowerCase() === 'tahun' || 
-            k.toLowerCase() === 'year'
-          );
-          mapped.year = yearKey ? String(row[yearKey]).trim() : new Date().getFullYear().toString();
-
-          const monthMapping: Record<string, string[]> = {
-            jan: ['jan', 'januari', 'january'],
-            feb: ['feb', 'februari', 'february'],
-            mar: ['mar', 'maret', 'march'],
-            apr: ['apr', 'april'],
-            may: ['mei', 'may'],
-            jun: ['jun', 'juni', 'june'],
-            jul: ['jul', 'juli', 'july'],
-            aug: ['agu', 'agustus', 'august', 'aug'],
-            sep: ['sep', 'september'],
-            oct: ['okt', 'oktober', 'october', 'oct'],
-            nov: ['nov', 'november'],
-            dec: ['des', 'desember', 'december', 'dec']
-          };
-
-          Object.entries(monthMapping).forEach(([dbField, aliases]) => {
-            const rowKey = Object.keys(row).find(k => 
-              aliases.includes(k.toLowerCase())
-            );
-            if (rowKey !== undefined) {
-              const valStr = String(row[rowKey]).trim().toLowerCase();
-              const isTrue = valStr === 'true' || valStr === '1' || valStr === 'yes' || valStr === 'ya' || valStr === 'y' || valStr === 'v' || valStr === 'x';
-              mapped[dbField] = isTrue ? 'TRUE' : 'FALSE';
-            } else {
-              mapped[dbField] = 'FALSE';
-            }
-          });
-
-          return mapped;
-        }).filter(r => r.petugas_name);
+        const mappedRows = processImportRows(json);
 
         if (mappedRows.length === 0) {
-          alert('Tidak ada data petugas yang valid ditemukan.');
+          toast.error('Tidak ada data petugas yang valid ditemukan.');
           return;
         }
 
-        if (confirm(`Apakah Anda yakin ingin meng-import ${mappedRows.length} data checklist survey kepuasan?`)) {
-          startTransition(async () => {
-            const res = await importSurveyKepuasanAction(mappedRows);
-            if (res.success) {
-              alert(res.message);
-            } else {
-              alert(res.error);
-            }
-          });
-        }
+        startTransition(async () => {
+          const res = await importSurveyKepuasanAction(mappedRows);
+          if (res.success) {
+            toast.success(res.message);
+          } else {
+            toast.error(res.error);
+          }
+        });
       } catch (err: any) {
-        alert(`Gagal memproses file: ${err.message}`);
+        toast.error(`Gagal memproses file: ${err.message}`);
       }
     };
     reader.readAsArrayBuffer(file);
     e.target.value = '';
   };
   
+  const handleSheetImport = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      try {
+        const csvData = await fetchSheetCsv(sheetUrl);
+        const csvText = new TextDecoder().decode(csvData);
+        const workbook = XLSX.read(csvText, { type: 'string' });
+        const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+        const mappedRows = processImportRows(json);
+        
+        const res = await importSurveyKepuasanAction(mappedRows);
+        if (res.success) {
+          toast.success(res.message);
+          setShowSheetModal(false);
+        } else {
+          toast.error(res.error);
+        }
+      } catch (err) {
+        toast.error('Gagal mengambil data dari Google Sheet.');
+      }
+    });
+  };
+
   // Modal states
   const [showModal, setShowModal] = useState(false);
+  const [showSheetModal, setShowSheetModal] = useState(false);
   const [formPetugasName, setFormPetugasName] = useState('');
   const [formYear, setFormYear] = useState(new Date().getFullYear().toString());
   const [errorMessage, setErrorMessage] = useState('');
+  const [sheetUrl, setSheetUrl] = useState('');
 
   // Row currently being toggled
   const [togglingIndex, setTogglingIndex] = useState<number | null>(null);
@@ -168,7 +198,7 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
       const res = await saveSurveyKepuasanAction(updatedRow);
       setTogglingIndex(null);
       if (!res.success) {
-        alert(res.error);
+        toast.error(res.error);
       }
     });
   };
@@ -183,7 +213,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
       return;
     }
 
-    // Check if already exists for this year
     const exists = data.some(
       row => row.petugas_name?.toLowerCase() === formPetugasName.toLowerCase() && String(row.year) === formYear
     );
@@ -214,7 +243,7 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
       startTransition(async () => {
         const res = await deleteSurveyKepuasanAction(row.__rowIndex);
         if (!res.success) {
-          alert(res.error);
+          toast.error(res.error);
         }
       });
     }
@@ -241,7 +270,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-1 items-center gap-3">
           <div className="relative flex-1 max-w-sm">
@@ -296,6 +324,15 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                 Import Excel
               </button>
               <button
+                type="button"
+                onClick={() => setShowSheetModal(true)}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Spreadsheet
+              </button>
+              <button
                 onClick={() => {
                   setFormPetugasName(petugasList[0] || '');
                   setFormYear(selectedYear);
@@ -312,7 +349,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
         </div>
       </div>
 
-      {/* Table Card */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -387,7 +423,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
         </div>
       )}
 
-      {/* Add Checklist Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
@@ -397,7 +432,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                 <X className="w-5 h-5" />
               </button>
             </div>
-
             <form onSubmit={handleSubmit}>
               <div className="p-6 space-y-4">
                 {errorMessage && (
@@ -405,7 +439,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                     {errorMessage}
                   </div>
                 )}
-
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase block">Nama Petugas</label>
                   <select
@@ -418,7 +451,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                     ))}
                   </select>
                 </div>
-
                 <div className="space-y-1.5">
                   <label className="text-[11px] font-bold text-slate-500 uppercase block">Tahun</label>
                   <input
@@ -430,7 +462,6 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                   />
                 </div>
               </div>
-
               <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -446,6 +477,51 @@ export function SurveyKepuasanTable({ data, isQA, petugasList }: SurveyKepuasanT
                 >
                   {isPending && <RefreshCw className="w-3 animate-spin" />}
                   Tambah Baris
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showSheetModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800">Import dari Google Spreadsheet</h3>
+              <button onClick={() => setShowSheetModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSheetImport}>
+              <div className="p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase block">URL Google Sheet (public)</label>
+                  <input
+                    type="text"
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    value={sheetUrl}
+                    onChange={(e) => setSheetUrl(e.target.value)}
+                    required
+                    className="w-full px-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-slate-800"
+                  />
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSheetModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#BE185D] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold shadow-md transition-colors"
+                >
+                  {isPending && <RefreshCw className="w-3 animate-spin" />}
+                  Import
                 </button>
               </div>
             </form>

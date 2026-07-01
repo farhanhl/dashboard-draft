@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveTemuanEksternalAction, deleteTemuanEksternalAction, importTemuanEksternalAction } from '@/app/actions/temuan';
+import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 
 interface TemuanEksternalTableProps {
   data: any[];
@@ -30,6 +31,8 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
   const [sortField, setSortField] = useState('tanggal_temuan');
   const [sortAsc, setSortAsc] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [showSheetModal, setShowSheetModal] = useState(false);
   const itemsPerPage = 8;
 
   // Import State & Ref
@@ -351,6 +354,19 @@ export function TemuanEksternalTable({ data, isQA, petugasList }: TemuanEksterna
             <Download className="w-3.5 h-3.5" />
             Export Excel
           </button>
+          {isQA && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowSheetModal(true)}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Spreadsheet
+              </button>
+            </>
+          )}
           
           {isQA && (
             <>

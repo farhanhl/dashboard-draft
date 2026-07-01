@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { saveCoachingAction, deleteCoachingAction, importCoachingAction } from '@/app/actions/coaching';
+import { fetchSheetCsv } from '@/lib/googleSheetHelper';
 
 interface CoachingTableProps {
   data: any[];
@@ -130,6 +131,8 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
   // CRUD & Details States
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showSheetModal, setShowSheetModal] = useState(false);
+  const [sheetUrl, setSheetUrl] = useState('');
   const [currentEditRow, setCurrentEditRow] = useState<any | null>(null);
   const [currentDetailsRow, setCurrentDetailsRow] = useState<any | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -340,11 +343,21 @@ export function CoachingTable({ data, isQA, petugasList }: CoachingTableProps) {
                 Import Excel
               </button>
               <button
+                type="button"
                 onClick={openAddModal}
                 className="flex items-center gap-1.5 px-3 py-2 bg-[#BE185D] hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-md transition-all"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Catat Coaching
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSheetModal(true)}
+                disabled={isPending}
+                className="flex items-center gap-1.5 px-3 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Import Spreadsheet
               </button>
             </>
           )}

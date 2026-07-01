@@ -7,7 +7,7 @@ import { getGoogleConfig, readSheetRows, testGoogleConnection } from '@/lib/goog
 export const revalidate = 0;
 
 export default async function TemuanEksternalPage() {
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   
   let isConnected = false;
   if (config) {
@@ -18,7 +18,7 @@ export default async function TemuanEksternalPage() {
   if (!isConnected) {
     return (
       <div className="flex flex-col flex-1 overflow-y-auto">
-        <Topbar title="Temuan Eksternal" isDatabaseConnected={false} />
+        <Topbar title="Temuan Eksternal" isDatabaseConnected={false} connectionName={config?.name} />
         <main className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50">
           <div className="max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center">
             <h3 className="text-lg font-bold text-slate-800 mb-2">Google Sheets Belum Terhubung</h3>
@@ -46,6 +46,7 @@ export default async function TemuanEksternalPage() {
         title="Temuan Eksternal" 
         subtitle="Daftar hasil pencatatan temuan operasional dari kanal luar" 
         isDatabaseConnected={true} 
+        connectionName={config?.name}
       />
 
       <main className="flex-1 p-8 space-y-6 bg-slate-50/30">

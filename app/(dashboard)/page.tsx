@@ -17,7 +17,7 @@ export const revalidate = 0; // Disable caching for real-time sheets updates
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   
   let isConnected = false;
   let isInitialized = false;
@@ -31,7 +31,7 @@ export default async function DashboardPage() {
   if (!isConnected || !isInitialized) {
     return (
       <div className="flex flex-col flex-1 overflow-y-auto">
-        <Topbar title="Dashboard" isDatabaseConnected={false} />
+        <Topbar title="Dashboard" isDatabaseConnected={false} connectionName={config?.name} />
         <main className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50">
           <div className="max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
             <div className="w-16 h-16 bg-blue-50 text-[#BE185D] rounded-2xl flex items-center justify-center mx-auto mb-6 border border-blue-100">
@@ -179,6 +179,7 @@ export default async function DashboardPage() {
         title="Dashboard Utama" 
         subtitle="Analisis performa layanan & rekapitulasi temuan kualitas" 
         isDatabaseConnected={true} 
+        connectionName={config?.name}
       />
 
       <main className="flex-1 p-8 space-y-8">

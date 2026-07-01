@@ -8,7 +8,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   
   let isConnected = false;
   if (config) {

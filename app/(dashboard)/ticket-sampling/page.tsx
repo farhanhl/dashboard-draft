@@ -7,7 +7,7 @@ import { getGoogleConfig, readSheetRows, testGoogleConnection } from '@/lib/goog
 export const revalidate = 0;
 
 export default async function TicketSamplingPage() {
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   
   let isConnected = false;
   if (config) {
@@ -18,7 +18,7 @@ export default async function TicketSamplingPage() {
   if (!isConnected) {
     return (
       <div className="flex flex-col flex-1 overflow-y-auto">
-        <Topbar title="List Ticket Sampling" isDatabaseConnected={false} />
+        <Topbar title="List Ticket Sampling" isDatabaseConnected={false} connectionName={config?.name} />
         <main className="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50">
           <div className="max-w-md bg-white border border-slate-200 rounded-2xl p-8 shadow-sm text-center">
             <h3 className="text-lg font-bold text-slate-800 mb-2">Google Sheets Belum Terhubung</h3>
@@ -46,6 +46,7 @@ export default async function TicketSamplingPage() {
         title="Checklist Ticket Sampling" 
         subtitle="Rekapitulasi pencapaian target sampling tiket bulanan per petugas" 
         isDatabaseConnected={true} 
+        connectionName={config?.name}
       />
 
       <main className="flex-1 p-8 space-y-6 bg-slate-50/30">

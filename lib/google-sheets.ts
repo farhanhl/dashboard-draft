@@ -1,12 +1,15 @@
 import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
+import { supabase } from './supabase';
 
 // File path for storing Google Sheets credentials locally
 const CREDENTIALS_DIR = path.join(process.cwd(), 'config');
 const CREDENTIALS_FILE = path.join(CREDENTIALS_DIR, 'google-credentials.json');
+const CONNECTIONS_FILE = path.join(CREDENTIALS_DIR, 'google-connections.json');
 
 export interface GoogleConfig {
+  name?: string;
   spreadsheetId: string;
   clientEmail: string;
   privateKey: string;
@@ -22,6 +25,15 @@ export interface GoogleConfig {
   };
 }
 
+export interface GoogleConnection {
+  id: string;
+  name: string;
+  spreadsheetId: string;
+  clientEmail: string;
+  privateKey: string;
+  active: boolean;
+}
+
 const DEFAULT_SHEET_NAMES = {
   config: 'Config',
   users: 'Users',
@@ -34,12 +46,36 @@ const DEFAULT_SHEET_NAMES = {
 };
 
 // 1. Get Google Credentials from local config or environment variables
-export function getGoogleConfig(): GoogleConfig | null {
+export async function getGoogleConfig(): Promise<GoogleConfig | null> {
+  // 1. Try reading from Supabase first (for dynamic Vercel persistence)
+  try {
+    const { data, error } = await supabase
+      .from('google_connections')
+      .select('*')
+      .eq('active', true)
+      .limit(1);
+
+    if (!error && data && data.length > 0) {
+      const active = data[0];
+      return {
+        name: active.name,
+        spreadsheetId: active.spreadsheet_id,
+        clientEmail: active.client_email,
+        privateKey: active.private_key,
+        sheetNames: DEFAULT_SHEET_NAMES,
+      };
+    }
+  } catch (error) {
+    console.error('Supabase fetching active config error:', error);
+  }
+
+  // 2. Fallback to local config file (for local development)
   try {
     if (fs.existsSync(CREDENTIALS_FILE)) {
       const fileData = fs.readFileSync(CREDENTIALS_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
       return {
+        name: parsed.name || 'Koneksi Lokal',
         spreadsheetId: parsed.spreadsheetId || '',
         clientEmail: parsed.clientEmail || '',
         privateKey: parsed.privateKey || '',
@@ -50,15 +86,15 @@ export function getGoogleConfig(): GoogleConfig | null {
     console.error('Error reading credentials file:', error);
   }
 
-  // Fallback to environment variables
+  // 3. Fallback to environment variables
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
   const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   let privateKey = process.env.GOOGLE_PRIVATE_KEY;
 
   if (spreadsheetId && clientEmail && privateKey) {
-    // Handle newline formatting in environment variable keys
     privateKey = privateKey.replace(/\\n/g, '\n');
     return {
+      name: 'Env Variables',
       spreadsheetId,
       clientEmail,
       privateKey,
@@ -100,6 +136,245 @@ export function saveGoogleConfig(config: GoogleConfig): void {
     console.error('Error saving credentials file:', error);
     throw new Error(`Gagal menyimpan berkas konfigurasi Google: ${error.message || error}`);
   }
+}
+
+// Get all saved connections
+export async function getGoogleConnections(): Promise<GoogleConnection[]> {
+  try {
+    const { data, error } = await supabase
+      .from('google_connections')
+      .select('*')
+      .order('created_at', { ascending: true });
+      
+    if (!error && data && data.length > 0) {
+      return data.map(d => ({
+        id: d.id,
+        name: d.name,
+        spreadsheetId: d.spreadsheet_id,
+        clientEmail: d.client_email,
+        privateKey: d.private_key,
+        active: d.active
+      }));
+    }
+  } catch (error) {
+    console.error('Error reading connections from Supabase:', error);
+  }
+
+  // Fallback: If Supabase fails or is empty, try reading local connections file
+  try {
+    if (fs.existsSync(CONNECTIONS_FILE)) {
+      const fileData = fs.readFileSync(CONNECTIONS_FILE, 'utf-8');
+      return JSON.parse(fileData);
+    }
+  } catch (error) {
+    console.error('Error reading connections file:', error);
+  }
+
+  // Fallback 2: If local connections file does not exist, but credentials file exists,
+  // import it as the first active connection.
+  const activeConfig = await getGoogleConfig();
+  if (activeConfig) {
+    const fallbackConn: GoogleConnection = {
+      id: 'conn_default',
+      name: 'Koneksi Utama',
+      spreadsheetId: activeConfig.spreadsheetId,
+      clientEmail: activeConfig.clientEmail,
+      privateKey: activeConfig.privateKey,
+      active: true,
+    };
+    
+    // Try to save to Supabase
+    try {
+      await supabase.from('google_connections').upsert({
+        id: fallbackConn.id,
+        name: fallbackConn.name,
+        spreadsheet_id: fallbackConn.spreadsheetId,
+        client_email: fallbackConn.clientEmail,
+        private_key: fallbackConn.privateKey,
+        active: fallbackConn.active
+      });
+    } catch (e) {}
+
+    // Save locally
+    try {
+      if (!fs.existsSync(CREDENTIALS_DIR)) {
+        fs.mkdirSync(CREDENTIALS_DIR, { recursive: true });
+      }
+      fs.writeFileSync(CONNECTIONS_FILE, JSON.stringify([fallbackConn], null, 2), 'utf-8');
+    } catch (e) {}
+
+    return [fallbackConn];
+  }
+
+  return [];
+}
+
+// Save a connection (add or update)
+export async function addOrUpdateGoogleConnection(conn: Omit<GoogleConnection, 'id' | 'active'> & { id?: string }): Promise<GoogleConnection> {
+  const id = conn.id || `conn_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const cleanedKey = cleanPrivateKey(conn.privateKey);
+
+  const connections = await getGoogleConnections();
+  const existingConn = connections.find(c => c.id === id);
+  const isNew = !existingConn;
+
+  let active = false;
+  if (isNew) {
+    active = connections.length === 0;
+  } else {
+    active = existingConn.active;
+  }
+
+  const newOrUpdatedConn: GoogleConnection = {
+    id,
+    name: conn.name.trim(),
+    spreadsheetId: conn.spreadsheetId.trim(),
+    clientEmail: conn.clientEmail.trim(),
+    privateKey: cleanedKey,
+    active,
+  };
+
+  // Upsert to Supabase
+  try {
+    await supabase.from('google_connections').upsert({
+      id,
+      name: newOrUpdatedConn.name,
+      spreadsheet_id: newOrUpdatedConn.spreadsheetId,
+      client_email: newOrUpdatedConn.clientEmail,
+      private_key: newOrUpdatedConn.privateKey,
+      active
+    });
+
+    if (active) {
+      // Deactivate other connections in Supabase
+      await supabase
+        .from('google_connections')
+        .update({ active: false })
+        .neq('id', id);
+    }
+  } catch (error) {
+    console.error('Error saving connection to Supabase:', error);
+  }
+
+  // Fallback/Local write too
+  try {
+    const localConns = connections.filter(c => c.id !== id);
+    localConns.push(newOrUpdatedConn);
+    if (!fs.existsSync(CREDENTIALS_DIR)) {
+      fs.mkdirSync(CREDENTIALS_DIR, { recursive: true });
+    }
+    fs.writeFileSync(CONNECTIONS_FILE, JSON.stringify(localConns, null, 2), 'utf-8');
+
+    if (active) {
+      saveGoogleConfig({
+        spreadsheetId: newOrUpdatedConn.spreadsheetId,
+        clientEmail: newOrUpdatedConn.clientEmail,
+        privateKey: newOrUpdatedConn.privateKey,
+      });
+    }
+  } catch (error) {
+    console.error('Error writing local files:', error);
+  }
+
+  return newOrUpdatedConn;
+}
+
+// Activate a connection
+export async function activateGoogleConnection(id: string): Promise<boolean> {
+  try {
+    // Mark target as active
+    await supabase
+      .from('google_connections')
+      .update({ active: true })
+      .eq('id', id);
+
+    // Mark others as inactive
+    await supabase
+      .from('google_connections')
+      .update({ active: false })
+      .neq('id', id);
+  } catch (error) {
+    console.error('Error activating connection in Supabase:', error);
+  }
+
+  const connections = await getGoogleConnections();
+  const targetConn = connections.find(c => c.id === id);
+  if (!targetConn) return false;
+
+  // Local update fallback
+  try {
+    connections.forEach(c => {
+      c.active = c.id === id;
+    });
+    if (!fs.existsSync(CREDENTIALS_DIR)) {
+      fs.mkdirSync(CREDENTIALS_DIR, { recursive: true });
+    }
+    fs.writeFileSync(CONNECTIONS_FILE, JSON.stringify(connections, null, 2), 'utf-8');
+
+    saveGoogleConfig({
+      spreadsheetId: targetConn.spreadsheetId,
+      clientEmail: targetConn.clientEmail,
+      privateKey: targetConn.privateKey,
+    });
+  } catch (error) {
+    console.error('Error updating local active connection:', error);
+  }
+
+  return true;
+}
+
+// Delete a connection
+export async function deleteGoogleConnection(id: string): Promise<boolean> {
+  const connections = await getGoogleConnections();
+  const targetConn = connections.find(c => c.id === id);
+  if (!targetConn) return false;
+
+  const wasActive = targetConn.active;
+
+  try {
+    await supabase
+      .from('google_connections')
+      .delete()
+      .eq('id', id);
+  } catch (error) {
+    console.error('Error deleting connection from Supabase:', error);
+  }
+
+  const remaining = connections.filter(c => c.id !== id);
+
+  if (wasActive && remaining.length > 0) {
+    remaining[0].active = true;
+    try {
+      await supabase
+        .from('google_connections')
+        .update({ active: true })
+        .eq('id', remaining[0].id);
+    } catch (e) {}
+  }
+
+  // Local update fallback
+  try {
+    if (!fs.existsSync(CREDENTIALS_DIR)) {
+      fs.mkdirSync(CREDENTIALS_DIR, { recursive: true });
+    }
+    fs.writeFileSync(CONNECTIONS_FILE, JSON.stringify(remaining, null, 2), 'utf-8');
+
+    if (wasActive && remaining.length > 0) {
+      saveGoogleConfig({
+        spreadsheetId: remaining[0].spreadsheetId,
+        clientEmail: remaining[0].clientEmail,
+        privateKey: remaining[0].privateKey,
+      });
+    } else if (remaining.length === 0) {
+      if (fs.existsSync(CREDENTIALS_FILE)) {
+        fs.unlinkSync(CREDENTIALS_FILE);
+      }
+    }
+  } catch (error) {
+    console.error('Error writing local files after deletion:', error);
+  }
+
+  return true;
 }
 
 // 3. Authenticate with Google Sheets API
@@ -155,7 +430,7 @@ export async function testGoogleConnection(config: GoogleConfig): Promise<{
 
 // 5. Read all rows from a sheet, mapping headers to object keys
 export async function readSheetRows<T = Record<string, string>>(sheetNameKey: keyof typeof DEFAULT_SHEET_NAMES): Promise<T[]> {
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   if (!config) return [];
 
   const actualSheetName = config.sheetNames?.[sheetNameKey] || DEFAULT_SHEET_NAMES[sheetNameKey];
@@ -206,7 +481,7 @@ export async function appendSheetRow(
   sheetNameKey: keyof typeof DEFAULT_SHEET_NAMES,
   rowData: Record<string, any>
 ): Promise<boolean> {
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   if (!config) return false;
 
   const actualSheetName = config.sheetNames?.[sheetNameKey] || DEFAULT_SHEET_NAMES[sheetNameKey];
@@ -255,7 +530,7 @@ export async function appendSheetRows(
   sheetNameKey: keyof typeof DEFAULT_SHEET_NAMES,
   rowsData: Record<string, any>[]
 ): Promise<boolean> {
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   if (!config || rowsData.length === 0) return false;
 
   const actualSheetName = config.sheetNames?.[sheetNameKey] || DEFAULT_SHEET_NAMES[sheetNameKey];
@@ -306,7 +581,7 @@ export async function updateSheetRow(
   rowIndex: number,
   rowData: Record<string, any>
 ): Promise<boolean> {
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   if (!config || !rowIndex || rowIndex < 2) return false;
 
   const actualSheetName = config.sheetNames?.[sheetNameKey] || DEFAULT_SHEET_NAMES[sheetNameKey];
@@ -352,7 +627,7 @@ export async function deleteSheetRow(
   sheetNameKey: keyof typeof DEFAULT_SHEET_NAMES,
   rowIndex: number
 ): Promise<boolean> {
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   if (!config || !rowIndex || rowIndex < 2) return false;
 
   const actualSheetName = config.sheetNames?.[sheetNameKey] || DEFAULT_SHEET_NAMES[sheetNameKey];

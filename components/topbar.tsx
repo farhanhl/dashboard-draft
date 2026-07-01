@@ -8,9 +8,10 @@ interface TopbarProps {
   title: string;
   subtitle?: string;
   isDatabaseConnected?: boolean;
+  connectionName?: string;
 }
 
-export function Topbar({ title, subtitle, isDatabaseConnected = true }: TopbarProps) {
+export function Topbar({ title, subtitle, isDatabaseConnected = true, connectionName }: TopbarProps) {
   const [currentDate, setCurrentDate] = useState<string>('');
 
   useEffect(() => {
@@ -48,7 +49,13 @@ export function Topbar({ title, subtitle, isDatabaseConnected = true }: TopbarPr
               : "bg-red-50 text-red-700 border-red-200"
           )}>
             <Database className="w-3.5 h-3.5" />
-            <span>Sheets: {isDatabaseConnected ? 'Connected' : 'Disconnected'}</span>
+            <span>
+              Sheets: {isDatabaseConnected ? (
+                <>Connected <span className="font-semibold text-emerald-600">({connectionName || 'Aktif'})</span></>
+              ) : (
+                'Disconnected'
+              )}
+            </span>
           </div>
         </div>
       </div>

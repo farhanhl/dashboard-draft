@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
 import { Topbar } from '@/components/topbar';
 import { GoogleIntegrationForm } from '@/components/google-integration-form';
-import { getGoogleConfig, testGoogleConnection } from '@/lib/google-sheets';
+import { getGoogleConfig, testGoogleConnection, getGoogleConnections } from '@/lib/google-sheets';
 
 export const revalidate = 0;
 
@@ -14,7 +14,8 @@ export default async function GoogleIntegrationPage() {
     redirect('/login');
   }
 
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
+  const connections = await getGoogleConnections();
   
   let isConnected = false;
   if (config) {
@@ -28,10 +29,11 @@ export default async function GoogleIntegrationPage() {
         title="Google Sheets Integration" 
         subtitle="Kelola koneksi basis data spreadsheet dan struktur tabel" 
         isDatabaseConnected={isConnected} 
+        connectionName={config?.name}
       />
 
       <main className="flex-1 p-8 space-y-6 bg-slate-50/50">
-        <GoogleIntegrationForm initialConfig={config} />
+        <GoogleIntegrationForm initialConfig={config} initialConnections={connections} />
       </main>
     </div>
   );

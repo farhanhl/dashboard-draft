@@ -6,7 +6,8 @@ import {
   authenticateQA,
   createSession,
   deleteSession,
-  hashPassword
+  hashPassword,
+  getCurrentUser
 } from '@/lib/auth';
 import {
   getGoogleConfig,
@@ -15,7 +16,12 @@ import {
   initializeSpreadsheet,
   appendSheetRow,
   readSheetRows,
-  GoogleConfig
+  GoogleConfig,
+  getGoogleConnections,
+  addOrUpdateGoogleConnection,
+  activateGoogleConnection,
+  deleteGoogleConnection,
+  GoogleConnection
 } from '@/lib/google-sheets';
 
 export async function loginAction(prevState: any, formData: FormData) {
@@ -39,7 +45,7 @@ export async function loginAction(prevState: any, formData: FormData) {
   }
 
   // First, verify Google Sheets config is present
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   if (!config) {
     return { error: 'Integrasi Google Sheets belum dikonfigurasi. Silakan hubungi administrator.' };
   }
@@ -100,7 +106,7 @@ export async function updateGoogleConfigAction(formData: FormData) {
 
 // 4. Test active connection or custom config
 export async function testConnectionAction(configParam?: GoogleConfig) {
-  const config = configParam || getGoogleConfig();
+  const config = configParam || await getGoogleConfig();
   if (!config) {
     return { success: false, error: 'Google Sheets belum dikonfigurasi.' };
   }
@@ -109,7 +115,7 @@ export async function testConnectionAction(configParam?: GoogleConfig) {
 
 // 5. Initialize sheets and seed default QA user
 export async function initializeSheetsAction() {
-  const config = getGoogleConfig();
+  const config = await getGoogleConfig();
   if (!config) {
     return { success: false, error: 'Google Sheets belum dikonfigurasi.' };
   }
@@ -149,4 +155,88 @@ export async function initializeSheetsAction() {
     success: true,
     message: 'Spreadsheet berhasil diinisialisasi dan siap digunakan.'
   };
+}
+
+// 6. Get all Google Connections Action
+export async function getGoogleConnectionsAction() {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak.' };
+  }
+  try {
+    const list = await getGoogleConnections();
+    return { success: true, connections: list };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 7. Save or Update Google Connection Action
+export async function saveGoogleConnectionAction(name: string, config: Omit<GoogleConfig, 'sheetNames'> & { id?: string }) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak.' };
+  }
+
+  if (!name.trim() || !config.spreadsheetId.trim() || !config.clientEmail.trim() || !config.privateKey.trim()) {
+    return { success: false, error: 'Semua field wajib diisi.' };
+  }
+
+  // Test connection first
+  const testRes = await testGoogleConnection(config);
+  if (!testRes.success) {
+    return { success: false, error: `Koneksi gagal: ${testRes.error}` };
+  }
+
+  try {
+    await addOrUpdateGoogleConnection({
+      id: config.id,
+      name,
+      spreadsheetId: config.spreadsheetId,
+      clientEmail: config.clientEmail,
+      privateKey: config.privateKey,
+    });
+    revalidatePath('/', 'layout');
+    return { success: true, message: 'Koneksi berhasil disimpan.' };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 8. Activate Google Connection Action
+export async function activateGoogleConnectionAction(id: string) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak.' };
+  }
+
+  try {
+    const success = await activateGoogleConnection(id);
+    if (success) {
+      revalidatePath('/', 'layout');
+      return { success: true, message: 'Koneksi berhasil diaktifkan.' };
+    }
+    return { success: false, error: 'Koneksi tidak ditemukan.' };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+// 9. Delete Google Connection Action
+export async function deleteGoogleConnectionAction(id: string) {
+  const user = await getCurrentUser();
+  if (!user || user.role !== 'QA') {
+    return { success: false, error: 'Akses ditolak.' };
+  }
+
+  try {
+    const success = await deleteGoogleConnection(id);
+    if (success) {
+      revalidatePath('/', 'layout');
+      return { success: true, message: 'Koneksi berhasil dihapus.' };
+    }
+    return { success: false, error: 'Koneksi tidak ditemukan.' };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
 }

@@ -4,7 +4,11 @@ import { useState, useTransition } from 'react';
 import { 
   updateGoogleConfigAction, 
   testConnectionAction, 
-  initializeSheetsAction 
+  initializeSheetsAction,
+  getGoogleConnectionsAction,
+  saveGoogleConnectionAction,
+  activateGoogleConnectionAction,
+  deleteGoogleConnectionAction
 } from '@/app/actions/auth';
 import { 
   Save, 
@@ -13,24 +17,116 @@ import {
   Play, 
   CheckCircle2, 
   XCircle, 
-  AlertTriangle 
+  AlertTriangle,
+  Trash2,
+  Edit2,
+  Plus,
+  Check
 } from 'lucide-react';
-import { GoogleConfig } from '@/lib/google-sheets';
+import { GoogleConfig, GoogleConnection } from '@/lib/google-sheets';
 
 interface GoogleIntegrationFormProps {
   initialConfig: GoogleConfig | null;
+  initialConnections: GoogleConnection[];
 }
 
-export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormProps) {
+export function GoogleIntegrationForm({ initialConfig, initialConnections }: GoogleIntegrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const [testResult, setTestResult] = useState<{ success?: boolean; title?: string; error?: string } | null>(null);
   const [initResult, setInitResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
   const [saveResult, setSaveResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
 
+  // Connection list state
+  const [connections, setConnections] = useState<GoogleConnection[]>(initialConnections);
+  const activeConn = initialConnections.find(c => c.active);
+
   // States for dynamic inputs
+  const [editingId, setEditingId] = useState<string | null>(initialConfig ? (activeConn?.id || 'conn_default') : null);
+  const [connectionName, setConnectionName] = useState(activeConn?.name || 'Koneksi Utama');
   const [spreadsheetId, setSpreadsheetId] = useState(initialConfig?.spreadsheetId || '');
   const [clientEmail, setClientEmail] = useState(initialConfig?.clientEmail || '');
   const [privateKey, setPrivateKey] = useState(initialConfig?.privateKey || '');
+
+  const loadConnections = async () => {
+    const res = await getGoogleConnectionsAction();
+    if (res.success && res.connections) {
+      setConnections(res.connections);
+    }
+  };
+
+  const handleSelectToEdit = (conn: GoogleConnection) => {
+    setEditingId(conn.id);
+    setConnectionName(conn.name);
+    setSpreadsheetId(conn.spreadsheetId);
+    setClientEmail(conn.clientEmail);
+    setPrivateKey(conn.privateKey);
+    setSaveResult(null);
+    setTestResult(null);
+    setInitResult(null);
+  };
+
+  const handleResetForm = () => {
+    setEditingId(null);
+    setConnectionName('Koneksi Baru');
+    setSpreadsheetId('');
+    setClientEmail('');
+    setPrivateKey('');
+    setSaveResult(null);
+    setTestResult(null);
+    setInitResult(null);
+  };
+
+  const handleActivate = async (id: string) => {
+    setSaveResult(null);
+    setTestResult(null);
+    setInitResult(null);
+    startTransition(async () => {
+      const res = await activateGoogleConnectionAction(id);
+      if (res.success) {
+        setSaveResult({ success: true, message: res.message });
+        const resList = await getGoogleConnectionsAction();
+        if (resList.success && resList.connections) {
+          setConnections(resList.connections);
+          const active = resList.connections.find(c => c.active);
+          if (active) {
+            setSpreadsheetId(active.spreadsheetId);
+            setClientEmail(active.clientEmail);
+            setPrivateKey(active.privateKey);
+            setConnectionName(active.name);
+            setEditingId(active.id);
+          }
+        }
+      } else {
+        setSaveResult({ success: false, error: res.error });
+      }
+    });
+  };
+
+  const handleDeleteConnection = async (id: string, name: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus koneksi "${name}"?`)) {
+      return;
+    }
+    setSaveResult(null);
+    setTestResult(null);
+    setInitResult(null);
+    startTransition(async () => {
+      const res = await deleteGoogleConnectionAction(id);
+      if (res.success) {
+        setSaveResult({ success: true, message: res.message });
+        const resList = await getGoogleConnectionsAction();
+        if (resList.success && resList.connections) {
+          setConnections(resList.connections);
+        } else {
+          setConnections([]);
+        }
+        if (editingId === id) {
+          handleResetForm();
+        }
+      } else {
+        setSaveResult({ success: false, error: res.error });
+      }
+    });
+  };
 
   // 1. Handle Config Save (Submits Form)
   const handleSave = async (e: React.FormEvent) => {
@@ -39,15 +135,24 @@ export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormPr
     setTestResult(null);
     setInitResult(null);
 
-    const formData = new FormData();
-    formData.append('spreadsheetId', spreadsheetId);
-    formData.append('clientEmail', clientEmail);
-    formData.append('privateKey', privateKey);
-
     startTransition(async () => {
-      const res = await updateGoogleConfigAction(formData);
+      const res = await saveGoogleConnectionAction(connectionName, {
+        id: editingId || undefined,
+        spreadsheetId: spreadsheetId.trim(),
+        clientEmail: clientEmail.trim(),
+        privateKey: privateKey,
+      });
+
       if (res.success) {
         setSaveResult({ success: true, message: res.message });
+        const resList = await getGoogleConnectionsAction();
+        if (resList.success && resList.connections) {
+          setConnections(resList.connections);
+          const matched = resList.connections.find(c => c.spreadsheetId === spreadsheetId.trim());
+          if (matched) {
+            setEditingId(matched.id);
+          }
+        }
       } else {
         setSaveResult({ success: false, error: res.error });
       }
@@ -102,7 +207,7 @@ export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormPr
   };
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6">
       {/* Messages */}
       {saveResult && (
         <div className={`p-4 rounded-xl border flex items-start gap-3 text-xs font-semibold ${
@@ -147,105 +252,206 @@ export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormPr
         </div>
       )}
 
-      {/* Main Configuration Card */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <Database className="w-4 h-4 text-[#BE185D]" />
-            Konfigurasi Google Sheets API
-          </h3>
-          <div className="text-[10px] text-slate-400 font-semibold">
-            Status: {initialConfig ? 'Terkonfigurasi' : 'Belum Terkonfigurasi'}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Left Column: Connection Profiles */}
+        <div className="space-y-4 lg:col-span-1">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Database className="w-3.5 h-3.5 text-[#BE185D]" />
+                Profil Koneksi ({connections.length})
+              </h4>
+              <button
+                type="button"
+                onClick={handleResetForm}
+                className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                Baru
+              </button>
+            </div>
+
+            {connections.length === 0 ? (
+              <div className="text-center py-6 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-xl">
+                Belum ada koneksi tersimpan
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                {connections.map((conn) => (
+                  <div
+                    key={conn.id}
+                    className={`p-3.5 rounded-xl border transition-all relative group cursor-pointer ${
+                      conn.active
+                        ? 'border-emerald-500 bg-emerald-50/30 ring-1 ring-emerald-500'
+                        : editingId === conn.id
+                        ? 'border-blue-400 bg-blue-50/20'
+                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100/50'
+                    }`}
+                    onClick={() => handleSelectToEdit(conn)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-800 line-clamp-1">{conn.name}</span>
+                          {conn.active && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-800">
+                              <Check className="w-2.5 h-2.5" /> Aktif
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono line-clamp-1">
+                          ID: {conn.spreadsheetId.substring(0, 10)}...
+                        </div>
+                      </div>
+                      
+                      {/* Hover / Actions */}
+                      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {!conn.active && (
+                          <button
+                            type="button"
+                            title="Aktifkan Koneksi"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleActivate(conn.id);
+                            }}
+                            className="p-1 bg-white hover:bg-emerald-50 border border-slate-200 rounded text-emerald-600 hover:text-emerald-700 shadow-sm transition-all"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          title="Hapus Koneksi"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteConnection(conn.id, conn.name);
+                          }}
+                          className="p-1 bg-white hover:bg-red-50 border border-slate-200 rounded text-red-650 hover:text-red-755 shadow-sm transition-all"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        <form onSubmit={handleSave} className="p-6 space-y-5">
-          {/* Spreadsheet ID */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">Spreadsheet ID</label>
-            <input 
-              type="text" 
-              required
-              value={spreadsheetId}
-              onChange={(e) => setSpreadsheetId(e.target.value)}
-              placeholder="1aBcD...eFgHiJkLmNoP"
-              className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-slate-800"
-            />
-            <p className="text-[10px] text-slate-500 leading-normal">
-              <strong>Cara menemukan:</strong> Buka Google Spreadsheet baru Anda di browser. ID Spreadsheet adalah rangkaian huruf & angka acak panjang pada URL setelah <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700">/d/</code> dan sebelum <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700">/edit</code>.
-              <br />
-              Contoh: <code className="text-slate-400 font-mono text-[9px]">https://docs.google.com/spreadsheets/d/<b>1aBcD...eFgHiJkLmNoP</b>/edit</code>
-            </p>
+        {/* Right Column: Connection Form & Settings */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Database className="w-4 h-4 text-[#BE185D]" />
+                {editingId ? 'Edit Koneksi' : 'Koneksi Baru'}
+              </h3>
+              <div className="text-[10px] text-slate-400 font-semibold">
+                Status: {editingId ? 'Profil Tersimpan' : 'Profil Baru'}
+              </div>
+            </div>
+
+            <form onSubmit={handleSave} className="p-6 space-y-5">
+              {/* Nama Koneksi */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">Nama Koneksi</label>
+                <input 
+                  type="text" 
+                  required
+                  value={connectionName}
+                  onChange={(e) => setConnectionName(e.target.value)}
+                  placeholder="Contoh: Spreadsheet Utama"
+                  className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-slate-800"
+                />
+              </div>
+
+              {/* Spreadsheet ID */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">Spreadsheet ID</label>
+                <input 
+                  type="text" 
+                  required
+                  value={spreadsheetId}
+                  onChange={(e) => setSpreadsheetId(e.target.value)}
+                  placeholder="1aBcD...eFgHiJkLmNoP"
+                  className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-slate-800"
+                />
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  <strong>Cara menemukan:</strong> Buka Google Spreadsheet baru Anda di browser. ID Spreadsheet adalah rangkaian huruf & angka acak panjang pada URL setelah <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700">/d/</code> dan sebelum <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-700">/edit</code>.
+                </p>
+              </div>
+
+              {/* Client Email */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">Service Account Email (Client Email)</label>
+                <input 
+                  type="email" 
+                  required
+                  value={clientEmail}
+                  onChange={(e) => setClientEmail(e.target.value)}
+                  placeholder="project-name@developer.gserviceaccount.com"
+                  className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-slate-800"
+                />
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  Dapat ditemukan pada file JSON key Anda pada baris properti <code className="bg-slate-100 px-1 py-0.5 rounded font-bold text-slate-700">"client_email"</code>.
+                  <br />
+                  <strong>PENTING:</strong> Bagikan (Share) Google Sheet Anda ke email ini dengan peran akses sebagai <strong>Editor</strong> agar data dapat dibaca/ditulis.
+                </p>
+              </div>
+
+              {/* Private Key */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 block">Private Key</label>
+                <textarea 
+                  rows={6}
+                  required
+                  value={privateKey}
+                  onChange={(e) => setPrivateKey(e.target.value)}
+                  placeholder="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC... \n-----END PRIVATE KEY-----\n"
+                  className="w-full px-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all font-mono text-slate-800"
+                />
+                <p className="text-[10px] text-slate-500 leading-normal">
+                  <strong>Cara menemukan:</strong> Buka file JSON key Anda di Notepad atau VS Code. Salin seluruh teks properti <code className="bg-slate-100 px-1 py-0.5 rounded font-bold text-slate-700">"private_key"</code>.
+                </p>
+              </div>
+
+              {/* Form Actions */}
+              <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  disabled={isPending}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#BE185D] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-md"
+                >
+                  {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  Simpan Koneksi
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTestConnection}
+                  disabled={isPending}
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-xs font-bold transition-all"
+                >
+                  {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Uji Koneksi
+                </button>
+
+                {editingId && (
+                  <button
+                    type="button"
+                    onClick={handleInitializeSheets}
+                    disabled={isPending}
+                    className="flex items-center gap-2 px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 rounded-lg text-xs font-bold transition-all"
+                  >
+                    {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                    Inisialisasi Spreadsheet
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
-
-          {/* Client Email */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">Service Account Email (Client Email)</label>
-            <input 
-              type="email" 
-              required
-              value={clientEmail}
-              onChange={(e) => setClientEmail(e.target.value)}
-              placeholder="project-name@developer.gserviceaccount.com"
-              className="w-full px-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-slate-800"
-            />
-            <p className="text-[10px] text-slate-500 leading-normal">
-              Dapat ditemukan pada file JSON key Anda pada baris properti <code className="bg-slate-100 px-1 py-0.5 rounded font-bold text-slate-700">"client_email"</code>.
-              <br />
-              <strong>PENTING:</strong> Bagikan (Share) Google Sheet Anda ke email ini dengan peran akses sebagai <strong>Editor</strong> agar data dapat dibaca/ditulis.
-            </p>
-          </div>
-
-          {/* Private Key */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 block">Private Key</label>
-            <textarea 
-              rows={6}
-              required
-              value={privateKey}
-              onChange={(e) => setPrivateKey(e.target.value)}
-              placeholder="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC... \n-----END PRIVATE KEY-----\n"
-              className="w-full px-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all font-mono text-slate-800"
-            />
-            <p className="text-[10px] text-slate-500 leading-normal">
-              <strong>Cara menemukan:</strong> Buka file JSON key Anda di Notepad atau VS Code. Salin seluruh teks properti <code className="bg-slate-100 px-1 py-0.5 rounded font-bold text-slate-700">"private_key"</code> dari tanda pembuka <code className="text-blue-700">-----BEGIN PRIVATE KEY-----</code> hingga penutup <code className="text-blue-700">-----END PRIVATE KEY-----</code>.
-            </p>
-          </div>
-
-          {/* Form Actions */}
-          <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-3">
-            <button
-              type="submit"
-              disabled={isPending}
-              className="flex items-center gap-2 px-4 py-2 bg-[#BE185D] hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all shadow-md"
-            >
-              {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-              Simpan & Hubungkan
-            </button>
-
-            <button
-              type="button"
-              onClick={handleTestConnection}
-              disabled={isPending}
-              className="flex items-center gap-2 px-4 py-2 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 rounded-lg text-xs font-bold transition-all"
-            >
-              {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-              Uji Koneksi
-            </button>
-
-            {initialConfig && (
-              <button
-                type="button"
-                onClick={handleInitializeSheets}
-                disabled={isPending}
-                className="flex items-center gap-2 px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 rounded-lg text-xs font-bold transition-all"
-              >
-                {isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                Inisialisasi Spreadsheet
-              </button>
-            )}
-          </div>
-        </form>
+        </div>
       </div>
 
       {/* Guide Card */}

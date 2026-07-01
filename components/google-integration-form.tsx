@@ -249,7 +249,7 @@ export function GoogleIntegrationForm({ initialConfig }: GoogleIntegrationFormPr
       </div>
 
       {/* Guide Card */}
-      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 flex items-start gap-4">
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 flex items-start gap-4">
         <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shrink-0">
           <AlertTriangle className="w-5 h-5" />
         </div>

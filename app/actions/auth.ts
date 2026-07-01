@@ -37,7 +37,7 @@ export async function loginAction(prevState: any, formData: FormData) {
     await createSession({
       id: 'user_admin_qa_1',
       email: 'admin@qa.com',
-      name: 'Admin QA TIM 3',
+      name: 'Admin QA',
       role: 'QA'
     });
     revalidatePath('/', 'layout');
@@ -134,7 +134,7 @@ export async function initializeSheetsAction() {
         id: 'user_admin_qa_1',
         email: 'admin@qa.com',
         password_hash: hashPassword('admin123'),
-        name: 'Admin QA TIM 3',
+        name: 'Admin QA',
         role: 'QA',
         created_at: new Date().toISOString(),
       };

@@ -21,7 +21,12 @@ import {
   Trash2,
   Edit2,
   Plus,
-  Check
+  Check,
+  HelpCircle,
+  Cloud,
+  Key,
+  FileSpreadsheet,
+  Settings
 } from 'lucide-react';
 import { GoogleConfig, GoogleConnection } from '@/lib/google-sheets';
 
@@ -35,6 +40,9 @@ export function GoogleIntegrationForm({ initialConfig, initialConnections }: Goo
   const [testResult, setTestResult] = useState<{ success?: boolean; title?: string; error?: string } | null>(null);
   const [initResult, setInitResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
   const [saveResult, setSaveResult] = useState<{ success?: boolean; message?: string; error?: string } | null>(null);
+
+  // Active guide tab state
+  const [activeGuideTab, setActiveGuideTab] = useState<'cloud' | 'serviceAccount' | 'sheet' | 'initialize'>('cloud');
 
   // Connection list state
   const [connections, setConnections] = useState<GoogleConnection[]>(initialConnections);
@@ -454,38 +462,344 @@ export function GoogleIntegrationForm({ initialConfig, initialConnections }: Goo
         </div>
       </div>
 
-      {/* Guide Card */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 flex items-start gap-4">
-        <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center shrink-0">
-          <AlertTriangle className="w-5 h-5" />
-        </div>
-        <div className="space-y-3">
-          <h4 className="text-xs font-bold text-slate-800">Panduan Lengkap Mendapatkan Kredensial Google Sheets</h4>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-[11px] text-slate-650 leading-relaxed font-semibold">
-            <div className="space-y-2">
-              <p className="font-bold text-slate-800 text-[11px] border-b border-slate-200 pb-1 uppercase tracking-wide">1. Mendapatkan Service Account & JSON Key</p>
-              <ul className="list-decimal pl-4 space-y-1.5">
-                <li>Buka <a href="https://console.cloud.google.com" target="_blank" className="text-blue-600 hover:underline">Google Cloud Console</a>.</li>
-                <li>Aktifkan <strong>Google Sheets API</strong> pada menu Enabled APIs & services.</li>
-                <li>Masuk ke halaman <strong>Credentials</strong>, klik Service Account yang telah Anda buat di bagian bawah.</li>
-                <li>Buka tab <strong>"Keys"</strong> di menu atas, klik <strong>"Add Key"</strong> -&gt; <strong>"Create new key"</strong>.</li>
-                <li>Pilih format <strong>JSON</strong> dan unduh file key tersebut ke komputer Anda.</li>
-                <li>Buka file JSON tersebut untuk mendapatkan nilai <code>client_email</code> dan <code>private_key</code>.</li>
-              </ul>
-            </div>
-
-            <div className="space-y-2">
-              <p className="font-bold text-slate-800 text-[11px] border-b border-slate-200 pb-1 uppercase tracking-wide">2. Menghubungkan Google Sheet</p>
-              <ul className="list-decimal pl-4 space-y-1.5">
-                <li>Buat Google Spreadsheet kosong baru di akun Google Drive Anda.</li>
-                <li>Salin <strong>Spreadsheet ID</strong> dari kolom URL browser Anda.</li>
-                <li>Klik tombol <strong>"Bagikan" (Share)</strong> pada Spreadsheet tersebut di pojok kanan atas.</li>
-                <li>Masukkan alamat email Service Account Anda (<code className="bg-slate-100 px-1 font-mono text-[10px]">...@gserviceaccount.com</code>) sebagai <strong>Editor</strong>, lalu klik Simpan.</li>
-                <li>Masukkan seluruh data ke form di atas, lalu klik <strong>Simpan & Hubungkan</strong> dan jalankan <strong>Inisialisasi Spreadsheet</strong>.</li>
-              </ul>
-            </div>
+      {/* Detailed Guide Card */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        {/* Header */}
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-xl bg-pink-50 text-[#BE185D] border border-pink-100 flex items-center justify-center shrink-0 shadow-sm">
+            <HelpCircle className="w-5 h-5" />
           </div>
+          <div>
+            <h4 className="text-sm font-bold text-slate-800">Panduan Lengkap &amp; Detail Integrasi Google Sheets</h4>
+            <p className="text-xs text-slate-500 mt-0.5 font-medium">
+              Ikuti 4 langkah terstruktur di bawah ini untuk menghubungkan dan menyiapkan basis data Google Spreadsheet Anda.
+            </p>
+          </div>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="flex border-b border-slate-100 overflow-x-auto bg-white">
+          <button
+            type="button"
+            onClick={() => setActiveGuideTab('cloud')}
+            className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all ${
+              activeGuideTab === 'cloud'
+                ? 'border-[#BE185D] text-[#BE185D] bg-pink-50/10'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50/50'
+            }`}
+          >
+            <Cloud className="w-4 h-4 shrink-0" />
+            1. Google Cloud &amp; API
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveGuideTab('serviceAccount')}
+            className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all ${
+              activeGuideTab === 'serviceAccount'
+                ? 'border-[#BE185D] text-[#BE185D] bg-pink-50/10'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50/50'
+            }`}
+          >
+            <Key className="w-4 h-4 shrink-0" />
+            2. Service Account &amp; JSON Key
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveGuideTab('sheet')}
+            className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all ${
+              activeGuideTab === 'sheet'
+                ? 'border-[#BE185D] text-[#BE185D] bg-pink-50/10'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50/50'
+            }`}
+          >
+            <FileSpreadsheet className="w-4 h-4 shrink-0" />
+            3. Google Sheet Sharing
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveGuideTab('initialize')}
+            className={`flex items-center gap-2 px-5 py-3.5 text-xs font-bold whitespace-nowrap border-b-2 transition-all ${
+              activeGuideTab === 'initialize'
+                ? 'border-[#BE185D] text-[#BE185D] bg-pink-50/10'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50/50'
+            }`}
+          >
+            <Settings className="w-4 h-4 shrink-0" />
+            4. Inisialisasi Struktur Tabel
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-6 bg-white min-h-[300px]">
+          {activeGuideTab === 'cloud' && (
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                Langkah 1: Konfigurasi Proyek &amp; Mengaktifkan API Layanan
+              </h5>
+              <div className="space-y-3.5 text-xs text-slate-650 leading-relaxed font-semibold">
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">1</span>
+                  <div>
+                    Buka portal resmi <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-650 hover:underline font-bold inline-flex items-center gap-0.5">Google Cloud Console <span className="text-[10px]">↗</span></a> dan masuk menggunakan akun Google Anda.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">2</span>
+                  <div>
+                    Klik dropdown proyek di pojok kiri atas (di sebelah logo Google Cloud) lalu klik tombol <strong className="text-slate-800">"Proyek Baru" (New Project)</strong>. Masukkan nama proyek (contoh: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[11px] text-slate-700 font-bold">QA Dashboard System</code>), lalu klik tombol <strong className="text-slate-800">Buat (Create)</strong>.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">3</span>
+                  <div>
+                    Tunggu hingga pembuatan proyek selesai. Setelah selesai, pastikan Anda beralih ke proyek baru tersebut dengan memilihnya di dropdown proyek kiri atas.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">4</span>
+                  <div>
+                    Ketik <strong className="text-slate-800">"Google Sheets API"</strong> di kolom pencarian utama di bagian atas, pilih API tersebut dari daftar hasil, lalu klik tombol biru <strong className="text-[#BE185D]">"Aktifkan" (Enable)</strong>.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">5</span>
+                  <div>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-bold">Sangat Direkomendasikan</span> Kembali ke bilah pencarian, cari <strong className="text-slate-800">"Google Drive API"</strong>, dan aktifkan juga. Hal ini membantu server dalam mengelola hak akses file secara dinamis.
+                  </div>
+                </div>
+              </div>
+
+              {/* Tips Callout */}
+              <div className="mt-6 p-4 bg-amber-50/50 border border-amber-250/60 rounded-xl flex gap-3 text-xs">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 font-semibold">
+                  <p className="font-bold text-amber-800">Mengapa menggunakan Google Cloud?</p>
+                  <p className="text-slate-650 leading-relaxed text-[11px]">
+                    Google Cloud Console digunakan untuk menjembatani sistem backend web ini dengan Google Sheets secara aman menggunakan protokol OAuth2/Service Account. Kuota gratis Google API sangat memadai untuk aktivitas harian dashboard QA.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeGuideTab === 'serviceAccount' && (
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                Langkah 2: Pembuatan Akun Layanan &amp; Unduh File Kunci Otorisasi
+              </h5>
+              <div className="space-y-3.5 text-xs text-slate-650 leading-relaxed font-semibold">
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">1</span>
+                  <div>
+                    Klik tombol menu navigasi kiri atas (ikon menu burger) di Google Cloud Console, arahkan kursor ke <strong className="text-slate-800">"IAM &amp; Admin"</strong>, lalu pilih <strong className="text-slate-800">"Service Accounts" (Akun Layanan)</strong>.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">2</span>
+                  <div>
+                    Klik tombol <strong className="text-slate-800 font-bold">+ Create Service Account</strong> di bagian atas layar.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">3</span>
+                  <div>
+                    Isi detail akun layanan:
+                    <ul className="list-disc pl-4 mt-1.5 space-y-1 text-[11px] text-slate-500">
+                      <li><strong className="text-slate-700">Service account name:</strong> ketik nama pengenal, misal <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">qa-dashboard-connector</code></li>
+                      <li><strong className="text-slate-700">Service account ID:</strong> terisi otomatis</li>
+                    </ul>
+                    Klik tombol <strong className="text-slate-800">Create and Continue</strong>.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">4</span>
+                  <div>
+                    Pada bagian <em className="text-slate-500">Grant this service account access to project</em>, Anda dapat langsung mengklik tombol <strong className="text-slate-800">Continue</strong> dan selanjutnya klik <strong className="text-slate-800">Done</strong> tanpa memilih peran (Role).
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">5</span>
+                  <div>
+                    Kembali ke daftar Service Account, Anda akan melihat alamat email baru berformat:
+                    <div className="my-2 p-2 bg-slate-50 border border-slate-200 rounded font-mono text-[10px] text-slate-600 select-all font-bold inline-block break-all">
+                      qa-dashboard-connector@proyek-anda.iam.gserviceaccount.com
+                    </div>
+                    <br />
+                    <strong className="text-[#BE185D]">Salin alamat email ini!</strong> Anda akan membutuhkannya untuk dimasukkan ke input <strong className="text-slate-800">"Service Account Email"</strong> di atas.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">6</span>
+                  <div>
+                    Klik alamat email tersebut untuk membuka halamannya. Lalu klik tab <strong className="text-slate-800">"Keys" (Kunci)</strong> di bagian atas.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">7</span>
+                  <div>
+                    Klik tombol <strong className="text-slate-800 font-bold">Add Key</strong> &gt; <strong className="text-slate-800 font-bold">Create new key</strong>. Pilih tipe format <strong className="text-slate-800">JSON</strong> lalu klik <strong className="text-slate-800">Create</strong>. Berkas kunci JSON rahasia akan terunduh otomatis ke komputer Anda.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">8</span>
+                  <div>
+                    Buka file JSON hasil unduhan tersebut menggunakan editor teks (Notepad/VS Code). Salin seluruh isi teks properti <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-slate-700">"private_key"</code> (termasuk karakter <code className="text-rose-700 font-bold">-----BEGIN PRIVATE KEY-----</code> sampai <code className="text-rose-700 font-bold">-----END PRIVATE KEY-----</code>) dan masukkan ke field input <strong className="text-slate-800">"Private Key"</strong> di form atas.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeGuideTab === 'sheet' && (
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                Langkah 3: Menghubungkan Google Spreadsheet &amp; Otorisasi Akses
+              </h5>
+              <div className="space-y-3.5 text-xs text-slate-650 leading-relaxed font-semibold">
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">1</span>
+                  <div>
+                    Buka Google Drive Anda, buat Google Spreadsheet baru (atau gunakan yang sudah ada) dan beri nama yang sesuai.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">2</span>
+                  <div>
+                    Dapatkan <strong className="text-slate-800">Spreadsheet ID</strong> dari URL browser.
+                    <div className="my-2 p-2 bg-slate-50 border border-slate-200 rounded font-mono text-[10px] text-slate-500 leading-normal">
+                      URL: https://docs.google.com/spreadsheets/d/<span className="text-[#BE185D] font-bold bg-pink-50 px-1 py-0.5 border border-pink-200 rounded">1H_g8pM45Xyz_zD9oK7wYJq-rN32UaBCdEfgH1234</span>/edit#gid=0
+                    </div>
+                    Salin deretan karakter acak panjang di antara <code className="bg-slate-100 px-1 font-mono text-[10px]">/d/</code> dan <code className="bg-slate-100 px-1 font-mono text-[10px]">/edit</code>, lalu masukkan ke field <strong className="text-slate-800">"Spreadsheet ID"</strong> di form atas.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">3</span>
+                  <div>
+                    Buka spreadsheet Anda tersebut, klik tombol biru <strong className="text-slate-800 font-bold">"Bagikan" (Share)</strong> di pojok kanan atas.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">4</span>
+                  <div>
+                    Masukkan alamat email Service Account yang Anda salin pada Langkah 2 (format email <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-[10px] text-slate-700">...@...gserviceaccount.com</code>).
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">5</span>
+                  <div>
+                    <strong className="text-rose-700">KRITIS:</strong> Pastikan Anda menyetel peran akses akun tersebut sebagai <strong className="text-slate-800">"Editor"</strong> (bukan Pelihat/Viewer) agar server program diizinkan memodifikasi baris spreadsheet. Klik tombol <strong className="text-slate-800">"Bagikan" (Share/Send)</strong>.
+                  </div>
+                </div>
+              </div>
+
+              {/* Warning Callout */}
+              <div className="mt-6 p-4 bg-rose-50/50 border border-rose-200/60 rounded-xl flex gap-3 text-xs">
+                <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="space-y-1 font-semibold">
+                  <p className="font-bold text-rose-800">Menghindari Error Otorisasi (Permission Denied)</p>
+                  <p className="text-slate-650 leading-relaxed text-[11px]">
+                    Jika Anda tidak membagikan dokumen spreadsheet ke email Service Account dengan hak Editor, uji koneksi akan memunculkan pesan error <code className="text-rose-650 bg-rose-50 px-1 font-mono text-[10px] rounded">"The caller does not have permission"</code>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeGuideTab === 'initialize' && (
+            <div className="space-y-4">
+              <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                Langkah 4: Penyimpanan Koneksi &amp; Inisialisasi Struktur Lembar Kerja (Worksheet)
+              </h5>
+              <div className="space-y-3.5 text-xs text-slate-650 leading-relaxed font-semibold">
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">1</span>
+                  <div>
+                    Setelah mengisi form di atas, klik tombol <strong className="text-slate-800">"Simpan Koneksi"</strong> terlebih dahulu untuk merekam profil ke database lokal/Supabase.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">2</span>
+                  <div>
+                    Klik tombol <strong className="text-slate-800">"Uji Koneksi"</strong>. Apabila berhasil, sistem akan merespon dengan info nama spreadsheet.
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">3</span>
+                  <div>
+                    Klik tombol biru <strong className="text-slate-800">"Inisialisasi Spreadsheet"</strong>. Sistem akan memeriksa dan membuat sheet-sheet baru yang diperlukan beserta header kolomnya:
+                  </div>
+                </div>
+
+                <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 text-[11px] bg-slate-50 p-4 rounded-xl border border-slate-200/60 font-semibold text-slate-600">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-slate-800 font-bold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#BE185D]"></div>
+                      Config
+                    </div>
+                    <div className="text-slate-500 font-normal pl-2.5">Metadata konfigurasi internal.</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-slate-800 font-bold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#BE185D]"></div>
+                      Users
+                    </div>
+                    <div className="text-slate-500 font-normal pl-2.5">
+                      Data login pengguna. Akan diisi user default QA: <code className="bg-slate-200 text-slate-800 px-1 py-0.5 rounded font-mono text-[9px]">admin@qa.com</code> / <code className="bg-slate-200 text-slate-800 px-1 py-0.5 rounded font-mono text-[9px]">admin123</code>.
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-slate-800 font-bold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#BE185D]"></div>
+                      Nilai Kualitas
+                    </div>
+                    <div className="text-slate-500 font-normal pl-2.5">Pencapaian performa QA bulanan Agen.</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-slate-800 font-bold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#BE185D]"></div>
+                      Temuan Sampling
+                    </div>
+                    <div className="text-slate-500 font-normal pl-2.5">Rekaman penilaian detil per indikator QA.</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-slate-800 font-bold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#BE185D]"></div>
+                      Temuan Eksternal
+                    </div>
+                    <div className="text-slate-500 font-normal pl-2.5">Kesalahan kritikal &amp; temuan luar operasional.</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-slate-800 font-bold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#BE185D]"></div>
+                      Survey Kepuasan
+                    </div>
+                    <div className="text-slate-500 font-normal pl-2.5">Persentase CSAT bulanan per Agen.</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-slate-800 font-bold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#BE185D]"></div>
+                      List Ticket Sampling
+                    </div>
+                    <div className="text-slate-500 font-normal pl-2.5">Target sampling audit tiket bulanan.</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 text-slate-800 font-bold">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#BE185D]"></div>
+                      Riwayat Coaching
+                    </div>
+                    <div className="text-slate-500 font-normal pl-2.5">Data tindak lanjut konseling &amp; coaching.</div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 font-bold text-[10px]">4</span>
+                  <div>
+                    <strong className="text-rose-700 font-bold">CATATAN PENTING:</strong> Jangan menghapus worksheet ataupun mengubah susunan teks header kolom di baris pertama spreadsheet yang dibuat. Sistem membaca data berdasarkan nama header kolom tersebut.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
